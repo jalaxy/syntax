@@ -1,0 +1,10 @@
+{
+    "files.associations": {
+        "exception": "cpp",
+        "iterator": "cpp",
+        "system_error": "cpp",
+        "utility": "cpp",
+        "xtr1common": "cpp",
+        "xutility": "cpp"
+    }
+}
