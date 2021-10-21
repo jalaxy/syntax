@@ -99,6 +99,7 @@ private:
 public:
     Tv data;
     vertex *aux; // auxiliary space for copying, storing latest related vertex address
+                 // or some other temporary auxiliary use
     vertex(const Tv &vdata)
     {
         data = Tv(vdata);
@@ -107,8 +108,11 @@ public:
     }
     size_t size() const { return edges.size(); }
     void sort() { edges.sort(0, edges.size() - 1); }
+    void merge(vertex &b) { edges.merge(&b.edges); }
+    void set_reduce() { edges.set_reduce(); }
     edge<Tv, Te> &operator[](int i) { return edges[i]; }
     bool operator<(const vertex &b) const { return data < b.data; }
+    bool operator==(const vertex &b) const { return data == b.data; }
 };
 
 template <class Tv, class Te>
@@ -126,5 +130,6 @@ public:
         to = NULL;
     }
     vertex<Tv, Te> *get_to() { return to; }
-    bool operator<(const edge &b) const { return data < b.data; }
+    bool operator<(const edge &b) const { return to->data < b.to->data; }
+    bool operator==(const edge &b) const { return to->data == b.to->data; }
 };

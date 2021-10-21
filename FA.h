@@ -16,13 +16,11 @@
 
 #define NON_TERMINAL ((unsigned int)0xffffffff)
 #define EPSILON ((unsigned int)0xffffffff)
-#define OP_ENCLS ((unsigned int)0xffffffff) // '*'
+#define OP_KLCLS ((unsigned int)0xffffffff) // '*'
 #define OP_CNCAT ((unsigned int)0xfffffffe) // ''
 #define OP_ALTER ((unsigned int)0xfffffffd) // '|'
 #define OP_RPRTH ((unsigned int)0xfffffffc) // ')'
 #define OP_LPRTH ((unsigned int)0xfffffffb) // '('
-typedef struct re re_t;
-typedef struct fa fa_t;
 
 struct edge_info
 {
@@ -38,10 +36,15 @@ struct vertex_info
 typedef vertex<vertex_info, edge_info> vertex_t;
 typedef edge<vertex_info, edge_info> edge_t;
 
-struct re
+class re
 {
-    unsigned int *expression;
+public:
+    unsigned int *expression; // must be followed by a extra right parenthesis
     unsigned int token;
+    re();
+    re(const re &b);
+    re(const unsigned int *EXPR, unsigned int TOKEN = NON_TERMINAL);
+    ~re();
 };
 
 class fa
@@ -63,12 +66,19 @@ public:
     fa &operator*();
 };
 
+struct hash_info
+{
+    int idx;
+    list<vertex_t *> subset;
+};
+
 extern unsigned int id;
 
 bool operator<(const vertex_info &a, const vertex_info &b);
 bool operator<(const edge_info &a, const edge_info &b);
 
-fa_t AtomicFA(unsigned int sigma);
-bool REToNFA(list<re_t> &relist, fa_t &nfa);
-void NFAToDFA(fa_t &fa);
-void MinimizeDFA(fa_t &dfa);
+void NormalizeID(fa &nfa);
+fa AtomicFA(unsigned int sigma);
+bool REToNFA(list<re> relist, fa &nfa);
+void NFAToDFA(fa nfa, fa &dfa);
+void MinimizeDFA(fa &dfa);

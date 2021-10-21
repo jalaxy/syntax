@@ -11,7 +11,7 @@
 
 #pragma once
 #include <malloc.h>
-#include <exception>
+#include <new>
 
 template <class T>
 class llist
@@ -72,7 +72,7 @@ private:
      */
     void destroy()
     {
-        free(head.p_data);
+        free((size_t *)head.p_data);
         llist<T> *p = head.next;
         while (p != NULL)
         {
@@ -99,6 +99,44 @@ private:
             p_rear = p->pre;
         delete p->p_data;
         free(p);
+        (*(size_t *)head.p_data)--;
+        out_of_date = true;
+    }
+
+    /**
+     * @brief Insert one node after pos
+     * 
+     * @param pos the position before the node to insert
+     * @param x the value of inserted node
+     */
+    void insert(llist<T> *pos, const T &x)
+    {
+        llist<T> *p = (llist<T> *)malloc(sizeof(llist<T>));
+        if (p == NULL)
+        {
+#ifdef HANDLE_MEMORY_EXCEPTION
+            HANDLE_MEMORY_EXCEPTION;
+#endif
+        }
+        try
+        {
+            p->p_data = new T(x);
+        }
+        catch (std::bad_alloc)
+        {
+#ifdef HANDLE_MEMORY_EXCEPTION
+            HANDLE_MEMORY_EXCEPTION;
+#endif
+        }
+        p->pre = pos;
+        p->next = pos->next;
+        pos->next = p;
+        if (p->next != NULL)
+            p->next->pre = p;
+        if (pos == p_rear)
+            p_rear = p;
+        (*(size_t *)head.p_data)++;
+        out_of_date = true;
     }
 
     /**
@@ -160,8 +198,6 @@ public:
         if (out_of_date)
             update();
         remove(array[idx]);
-        (*(size_t *)head.p_data)--;
-        out_of_date = true;
     }
 
     /**
@@ -174,33 +210,7 @@ public:
     {
         if (out_of_date)
             update();
-        llist<T> *p = (llist<T> *)malloc(sizeof(llist<T>)),
-                 *cur = idx < 0 ? &head : array[idx];
-        if (p == NULL)
-        {
-#ifdef HANDLE_MEMORY_EXCEPTION
-            HANDLE_MEMORY_EXCEPTION;
-#endif
-        }
-        try
-        {
-            p->p_data = new T(x);
-        }
-        catch (std::bad_alloc)
-        {
-#ifdef HANDLE_MEMORY_EXCEPTION
-            HANDLE_MEMORY_EXCEPTION;
-#endif
-        }
-        p->pre = cur;
-        p->next = cur->next;
-        cur->next = p;
-        if (p->next != NULL)
-            p->next->pre = p;
-        if (idx == *(size_t *)head.p_data - 1)
-            p_rear = p;
-        (*(size_t *)head.p_data)++;
-        out_of_date = true;
+        insert(idx < 0 ? &head : array[idx], x);
     }
 
     /**
@@ -208,14 +218,21 @@ public:
      * 
      * @param x the element to append
      */
-    void append(const T &x) { insert(*(size_t *)head.p_data - 1, x); }
+    void append(const T &x) { insert(p_rear, x); }
 
     /**
      * @brief Stack operation push
      * 
      * @param x the element to push
      */
-    void push_back(const T &x) { insert(*(size_t *)head.p_data - 1, x); }
+    void push_back(const T &x) { insert(p_rear, x); }
+
+    /**
+     * @brief Push a node to front
+     * 
+     * @param x the element to push
+     */
+    void push_front(const T &x) { insert(&head, x); }
 
     /**
      * @brief Stack operation pop
@@ -223,8 +240,18 @@ public:
      */
     void pop_back()
     {
-        if (*(size_t *)head.p_data > 0)
-            remove(*(size_t *)head.p_data - 1);
+        if (p_rear != &head)
+            remove(p_rear);
+    }
+
+    /**
+     * @brief Pop the first node
+     * 
+     */
+    void pop_front()
+    {
+        if (head.next != NULL)
+            remove(head.next);
     }
 
     /**
@@ -237,9 +264,11 @@ public:
     /**
      * @brief The stack element under top
      * 
-     * @return T& 
+     * @return the second last element
      */
-    T &undertop() const { return *p_rear->pre->p_data; }
+    T &undertop() const { return p_rear->pre == NULL ? *head.p_data : *p_rear->pre->p_data; }
+
+    T &bottom() const { return head.next == NULL ? *head.p_data : *head.next->p_data; }
 
     /**
      * @brief 
@@ -284,13 +313,57 @@ public:
     }
 
     /**
+     * @brief Binary search for first element with value x.
+     *        Sorted (and updated) required
+     * 
+     * @return index of value, -1 if not found
+     */
+    int bsearch(T x) const
+    {
+        int l = 0, r = size() - 1;
+        while (l + 1 < r)
+        {
+            int m = (l + r) / 2;
+            if (*array[m]->p_data < x)
+                l = m;
+            else if (*array[m]->p_data >= x)
+                r = m;
+        }
+        if (*array[l]->p_data == x)
+            return l;
+        if (*array[r]->p_data == x)
+            return r;
+        return -1;
+    }
+
+    /**
+     * @brief Reduce a multiset to a set when this list is considered as a multiset
+     * 
+     */
+    void set_reduce()
+    {
+        sort(0, size() - 1);
+        llist<T> *p = head.next;
+        while (p != NULL)
+        {
+            llist<T> *q = p->next;
+            if (q != NULL && *q->p_data == *p->p_data)
+                remove(q);
+            else
+                p = p->next;
+        }
+    }
+
+    /**
      * @brief Append b directly after this object, and as a result,
      *        *pb will be cleared
      * 
-     * @param pb pointer to a dynamic object
+     * @param pb pointer to another object
      */
     void merge(list<T> *pb)
     {
+        if (pb->head.next == NULL || pb == this)
+            return;
         p_rear->next = pb->head.next;
         pb->head.next->pre = p_rear;
         p_rear = pb->p_rear;
@@ -378,5 +451,20 @@ public:
         for (int i = 0; i < b.size(); i++)
             append(((list<T> &)b)[i]);
         return *this;
+    }
+
+    bool operator==(const list<T> &b) const
+    {
+        if (size() != b.size())
+            return false;
+        llist<T> *p = head.next, *bp = b.head.next;
+        while (p != NULL && bp != NULL)
+        {
+            if (*p->p_data != *bp->p_data)
+                return false;
+            p = p->next;
+            bp = bp->next;
+        }
+        return true;
     }
 };

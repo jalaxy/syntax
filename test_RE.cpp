@@ -5,7 +5,7 @@
 // #include <iostream>
 using namespace std;
 fstream cin, cout;
-void print(fa_t nfa)
+void print(fa nfa)
 {
     cout << "sigma:\t[0, " << nfa.sigma_range << ")\n";
     cout << "start:\t" << nfa.s << "\n";
@@ -32,58 +32,63 @@ void print(fa_t nfa)
         }
         cout << endl;
     }
+    cout << "****************************************************************" << endl;
 }
 int main()
 {
-    // test-1: (1|2)*.(((a.b|3.2*.c)*|c|d*.e.a).4.e|((d|e).(e|a*)).b|(2.1.3*)*.((a.c)*|c))|c.e
-    list<re_t> relist;
+    list<re> relist;
     cin.open("test_RE.in", ios::in);
     cout.open("test_RE.out", ios::out);
+    unsigned int token = 0;
     while (!cin.fail())
     {
         const int size = 65536;
         char *s = new char[size];
-        cin.getline(s, size);
-        unsigned int *a = new unsigned int[size];
-        for (int i = 0; i < strlen(s); i++)
-            switch (s[i])
-            {
-            case ' ':
-            case '\t':
+        relist = list<re>();
+        while (true)
+        {
+            cin.getline(s, size);
+            if (cin.fail() || s[0] == '\0')
                 break;
-            case '|':
-                a[i] = OP_ALTER;
-                break;
-            case '*':
-                a[i] = OP_ENCLS;
-                break;
-            case '.':
-                a[i] = OP_CNCAT;
-                break;
-            case '(':
-                a[i] = OP_LPRTH;
-                break;
-            case ')':
-                a[i] = OP_RPRTH;
-                break;
-            default:
-                a[i] = s[i];
-                break;
-            }
-        a[strlen(s)] = OP_RPRTH;
-        relist = list<re_t>();
-        relist.append({a, 12});
-        fa_t nfa;
+            unsigned int *a = new unsigned int[size];
+            for (int i = 0; i < strlen(s); i++)
+                switch (s[i])
+                {
+                case ' ':
+                case '\t':
+                    break;
+                case '|':
+                    a[i] = OP_ALTER;
+                    break;
+                case '*':
+                    a[i] = OP_KLCLS;
+                    break;
+                case '.':
+                    a[i] = OP_CNCAT;
+                    break;
+                case '(':
+                    a[i] = OP_LPRTH;
+                    break;
+                case ')':
+                    a[i] = OP_RPRTH;
+                    break;
+                default:
+                    a[i] = s[i];
+                    break;
+                }
+            a[strlen(s)] = OP_RPRTH;
+            relist.append(re(a, token++));
+            delete[] a;
+        }
+        fa nfa;
         id = 0;
         clock_t t_s = clock();
         bool valid = REToNFA(relist, nfa) ? "true" : "false";
+        cout << "Expression: " << s << endl;
         cout << "Elapsed time is " << clock() - t_s << " ms\n";
         cout << valid << endl;
-        for (int i = 0; i < nfa.g.size(); i++)
-            nfa.g[i].data.value = i;
         print(nfa);
         delete[] s;
-        delete[] a;
     }
     return 0;
 }
