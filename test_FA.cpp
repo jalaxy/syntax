@@ -2,12 +2,35 @@
 #include <iostream>
 #include <cstring>
 #include <ctime>
+#include <iomanip>
 using namespace std;
 void EpsilonClosure(fa &nfa);
 void print(list<vertex_t *> l)
 {
     for (int i = 0; i < l.size(); i++)
         cout << l[i]->data.value << " ";
+    cout << endl;
+}
+void print(list<int> l)
+{
+    for (int i = 0; i < l.size(); i++)
+        cout << l[i] << " ";
+    cout << endl;
+}
+void print(list<unsigned int> l)
+{
+    for (int i = 0; i < l.size(); i++)
+        cout << l[i] << " ";
+    cout << endl;
+}
+void print(list<list<int>> l)
+{
+    for (int i = 0; i < l.size(); i++)
+    {
+        for (int j = 0; j < l[i].size(); j++)
+            cout << l[i][j] << " ";
+        cout << endl;
+    }
     cout << endl;
 }
 void print(fa &nfa)
@@ -29,15 +52,41 @@ void print(fa &nfa)
             cout << "\t" << nfa.g[i].data.token;
         for (int j = 0; j < nfa.g[i].size(); j++)
         {
-            cout << "\t" << nfa.g[i][j].get_to()->data.value;
+            cout << "\t" << nfa.g[i][j].to->data.value;
             if (nfa.g[i][j].data.value == EPSILON)
                 cout << "\tE";
             else
-                cout << "\t'" << (char)nfa.g[i][j].data.value << "'";
+                cout << "\t\'" << (char)(nfa.g[i][j].data.value + '0') << "\'";
         }
         cout << endl;
     }
     cout << "****************************************************************" << endl;
+}
+void print(dfa_table table)
+{
+    cout << setw(8) << "Table"
+         << "|";
+    for (int i = 0; i < table.get_col(); i++)
+        cout << setw(8) << i;
+    cout << endl;
+    for (int i = 0; i < table.get_row(); i++)
+    {
+        if (i == table.get_start())
+            if (table.is_acceptable(i))
+                cout << " f s" << setw(4) << i << "|";
+            else
+                cout << " s" << setw(6) << i << "|";
+        else if (table.is_acceptable(i))
+            cout << " f" << setw(6) << i << "|";
+        else
+            cout << setw(8) << i << "|";
+        for (int j = 0; j < table.get_col(); j++)
+            if (table[i][j] == UNDEFINED)
+                cout << setw(8) << "U";
+            else
+                cout << setw(8) << table[i][j];
+        cout << endl;
+    }
 }
 int main()
 {
@@ -57,6 +106,9 @@ int main()
         case '*':
             a[i] = OP_KLCLS;
             break;
+        case '~':
+            a[i] = OP_CMPLM;
+            break;
         case '.':
             a[i] = OP_CNCAT;
             break;
@@ -66,11 +118,15 @@ int main()
         case ')':
             a[i] = OP_RPRTH;
             break;
+        case '!':
+            a[i] = EPSILON;
+            break;
         default:
-            a[i] = s[i];
+            a[i] = s[i] - '0';
             break;
         }
     a[strlen(s)] = OP_RPRTH;
+    a[strlen(s) + 1] = OP_TRMNL;
     list<re> rl;
     rl.append(re(a, 0));
     clock_t ts = clock();
@@ -81,6 +137,11 @@ int main()
     NFAToDFA(nfa, dfa);
     clock_t t2 = clock() - ts;
     print(dfa);
-    cout << "Elapsed time: " << t1 << " ms : " << t2 << " ms\n";
+    ts = clock();
+    MinimizeDFA(dfa);
+    clock_t t3 = clock() - ts;
+    print(dfa);
+    print(dfa_table(dfa));
+    cout << "Elapsed time: " << t1 << " ms : " << t2 << "ms : " << t3 << " ms\n";
     return 0;
 }

@@ -453,6 +453,12 @@ public:
         return *this;
     }
 
+    /**
+     * @brief Operator ==
+     * 
+     * @param b another object
+     * @return whether this object equals to b
+     */
     bool operator==(const list<T> &b) const
     {
         if (size() != b.size())
@@ -466,5 +472,28 @@ public:
             bp = bp->next;
         }
         return true;
+    }
+
+    /**
+     * @brief Operator <
+     * 
+     * @param b another object
+     * @return whether this object is superior than b in dictionary order
+     */
+    bool operator<(const list<T> &b) const
+    {
+        llist<T> *p = head.next, *bp = b.head.next;
+        while (p != NULL && bp != NULL)
+        {
+            if (*p->p_data < *bp->p_data)
+                return true;
+            else if (*p->p_data > *bp->p_data)
+                return false;
+            p = p->next;
+            bp = bp->next;
+        }
+        if (p == NULL && bp != NULL)
+            return true;
+        return false;
     }
 };

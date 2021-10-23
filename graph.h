@@ -112,24 +112,27 @@ public:
     void set_reduce() { edges.set_reduce(); }
     edge<Tv, Te> &operator[](int i) { return edges[i]; }
     bool operator<(const vertex &b) const { return data < b.data; }
-    bool operator==(const vertex &b) const { return data == b.data; }
 };
 
 template <class Tv, class Te>
 class edge
 {
 private:
-    vertex<Tv, Te> *to;
     friend class graph<Tv, Te>;
 
 public:
+    vertex<Tv, Te> *to;
     Te data;
     edge(const Te &vdata)
     {
         data = Te(vdata);
         to = NULL;
     }
-    vertex<Tv, Te> *get_to() { return to; }
-    bool operator<(const edge &b) const { return to->data < b.to->data; }
-    bool operator==(const edge &b) const { return to->data == b.to->data; }
+    bool operator<(const edge &b) const
+    {
+        if (data == b.data)
+            return to < b.to;
+        return data < b.data;
+    }
+    bool operator==(const edge &b) const { return to == b.to && data == b.data; }
 };

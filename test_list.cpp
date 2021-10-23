@@ -12,10 +12,15 @@ void print(list<int> l)
 }
 int main()
 {
-    list<int> l;
+    list<int> l, m;
     l += 1;
-    print(l);
-    l.set_reduce();
-    print(l);
+    l += 1;
+    l += 3;
+    l += 2;
+    m += 1;
+    m += 2;
+    m += 3;
+    m += 1;
+    cout << (l < m) << endl;
     return 0;
 }
