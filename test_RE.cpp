@@ -24,7 +24,7 @@ void print(fa nfa)
             cout << "\t" << nfa.g[i].data.token;
         for (int j = 0; j < nfa.g[i].size(); j++)
         {
-            cout << "\t" << nfa.g[i][j].get_to()->data.value;
+            cout << "\t" << nfa.g[i][j].to->data.value;
             if (nfa.g[i][j].data.value == EPSILON)
                 cout << "\tE";
             else
@@ -36,7 +36,7 @@ void print(fa nfa)
 }
 int main()
 {
-    list<re> relist;
+    list<expr> relist;
     cin.open("test_RE.in", ios::in);
     cout.open("test_RE.out", ios::out);
     unsigned int token = 0;
@@ -44,7 +44,7 @@ int main()
     {
         const int size = 65536;
         char *s = new char[size];
-        relist = list<re>();
+        relist = list<expr>();
         while (true)
         {
             cin.getline(s, size);
@@ -76,14 +76,15 @@ int main()
                     a[i] = s[i];
                     break;
                 }
-            a[strlen(s)] = OP_RPRTH;
-            relist.append(re(a, token++));
+            a[strlen(s)] = OP_TRMNL;
+            relist.append(expr(token++, a));
             delete[] a;
         }
         fa nfa;
         id = 0;
         clock_t t_s = clock();
         bool valid = REToNFA(relist, nfa) ? "true" : "false";
+        cout << "Size: " << relist.size() << endl;
         cout << "Expression: " << s << endl;
         cout << "Elapsed time is " << clock() - t_s << " ms\n";
         cout << valid << endl;

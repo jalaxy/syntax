@@ -1,21 +1,33 @@
+Size: 54
 Expression: 
-Elapsed time is 0 ms
+Elapsed time is 1 ms
 1
-sigma:	[0, 53)
-start:	0x2612150
-final:	0x26121a0 0x2611ed0 0x26121f0 
+sigma:	[0, 56)
+start:	0xfc6368
+final:	0xfc66c8 
 graph:	
 	vertex			token		edges
-	0	0xfd1d40		1	'1'
-	1	0xfd7e30		5	E
-	2	0x26120b0		3	'2'
-	3	0x2611e30		5	E
-	4	0x2612100		0	E	2	E
-	5	0x26121a0	0	4	E
-	6	0x2611e80		7	'3'
-	7	0x2611ed0	1
-	8	0x2611f70		9	'4'
-	9	0x26121f0	1
-	10	0x2612290		6	E	8	E
-	11	0x2612150		5	E	10	E
+	1	0xfc61e8		2	'7'
+	2	0xfc6218		23	E
+	3	0xfc6518		4	'2'
+	4	0xfc6098		23	E
+	5	0xfc62a8		1	E	3	E
+	6	0xfc60f8		7	'5'
+	7	0xfc63c8		23	E
+	8	0xfc62d8		5	E	6	E
+	9	0xfc6428		10	'3'
+	10	0xfc6308		23	E
+	11	0xfc6368		8	E	9	E
+	12	0xfc6398		13	'7'
+	13	0xfc63f8		23	E
+	14	0xfc6458		15	'2'
+	15	0xfc64e8		23	E
+	16	0xfc66f8		12	E	14	E
+	17	0xfc6728		18	'5'
+	18	0xfc67e8		23	E
+	19	0xfc6818		16	E	17	E
+	20	0xfc6758		21	'3'
+	21	0xfc6788		23	E
+	22	0xfc6698		19	E	20	E
+	23	0xfc66c8	0	22	E
 ****************************************************************

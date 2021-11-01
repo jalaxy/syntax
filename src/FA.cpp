@@ -14,76 +14,218 @@
 unsigned int id = 0;
 
 /**
- * @brief Construct a default re object
- * 
- */
-re::re()
-{
-    expression = (unsigned int *)malloc(sizeof(unsigned int) * 2);
-    if (expression == NULL)
-    {
-#ifdef HANDLE_MEMORY_EXCEPTION
-        HANDLE_MEMORY_EXCEPTION;
-#endif
-    }
-    expression[0] = OP_RPRTH;
-    expression[1] = OP_TRMNL;
-    token = NON_TERMINAL;
-}
-
-/**
- * @brief Construct a new re object from another object
+ * @brief Construct a new expr object from another object
  * 
  * @param b the other object
  */
-re::re(const re &b)
+expr::expr(const expr &b)
 {
     int len = 0;
-    while (b.expression[len] != OP_TRMNL)
+    while (b.rhs[len] != OP_TRMNL)
         len++;
-    expression = (unsigned int *)malloc(sizeof(unsigned int) * (len + 1));
-    if (expression == NULL)
+    rhs = (unsigned int *)malloc(sizeof(unsigned int) * (len + 1));
+    if (rhs == NULL)
     {
 #ifdef HANDLE_MEMORY_EXCEPTION
         HANDLE_MEMORY_EXCEPTION;
 #endif
     }
-    for (int i = 0; i <= len; i++)
-        expression[i] = b.expression[i];
-    token = b.token;
+    memcpy(rhs, b.rhs, sizeof(unsigned int) * (len + 1));
+    lhs = b.lhs;
 }
 
 /**
- * @brief Construct a new re object by elements
+ * @brief Construct a new expr object with left-hand side value
  * 
- * @param EXPR expression
- * @param TOKEN token
+ * @param LHS left-hand side value
  */
-re::re(const unsigned int *EXPR, unsigned int TOKEN)
+expr::expr(unsigned int LHS)
 {
-    int len = 0;
-    while (EXPR[len] != OP_TRMNL)
-        len++;
-    expression = (unsigned int *)malloc(sizeof(unsigned int) * (len + 1));
-    if (expression == NULL)
+    rhs = (unsigned int *)malloc(sizeof(unsigned int));
+    if (rhs == NULL)
     {
 #ifdef HANDLE_MEMORY_EXCEPTION
         HANDLE_MEMORY_EXCEPTION;
 #endif
     }
-    for (int i = 0; i <= len; i++)
-        expression[i] = EXPR[i];
-    token = TOKEN;
+    rhs[0] = OP_TRMNL;
+}
+
+/**
+ * @brief Construct a new expr object by elements
+ * 
+ * @param LHS left-hand-side value
+ * @param EXPR right-side expression
+ */
+expr::expr(unsigned int LHS, const unsigned int *RHS)
+{
+    int len = 0;
+    while (RHS[len] != OP_TRMNL)
+        len++;
+    rhs = (unsigned int *)malloc(sizeof(unsigned int) * (len + 1));
+    if (rhs == NULL)
+    {
+#ifdef HANDLE_MEMORY_EXCEPTION
+        HANDLE_MEMORY_EXCEPTION;
+#endif
+    }
+    memcpy(rhs, RHS, sizeof(unsigned int) * (len + 1));
+    lhs = LHS;
 }
 
 /**
  * @brief Destroy the re::re object
  * 
  */
-re::~re()
+expr::~expr()
 {
-    if (expression != NULL)
-        free(expression);
+    if (rhs != NULL)
+        free(rhs);
+}
+
+/**
+ * @brief Assignment function
+ * 
+ * @param b another object
+ * @return reference to this object
+ */
+expr &expr::operator=(const expr &b)
+{
+    if (rhs != NULL)
+        free(rhs);
+    int len = 0;
+    while (b.rhs[len] != OP_TRMNL)
+        len++;
+    rhs = (unsigned int *)malloc(sizeof(unsigned int) * (len + 1));
+    if (rhs == NULL)
+    {
+#ifdef HANDLE_MEMORY_EXCEPTION
+        HANDLE_MEMORY_EXCEPTION;
+#endif
+    }
+    memcpy(rhs, b.rhs, sizeof(unsigned int) * (len + 1));
+    lhs = b.lhs;
+    return *this;
+}
+
+/**
+ * @brief Comparison between two expression object
+ * 
+ * @param b another object
+ * @return whether lhs is less than b.lhs
+ */
+bool expr::operator<(const expr &b) const { return lhs < b.lhs; }
+
+/**
+ * @brief Alternation operator
+ * 
+ * @param b another RE
+ * @return A | B 
+ */
+expr expr::operator|(const expr &b) const
+{
+    int len = 0, lenb = 0;
+    for (unsigned int *p = rhs; *p != OP_TRMNL; p++)
+        len++;
+    for (unsigned int *p = b.rhs; *p != OP_TRMNL; p++)
+        lenb++;
+    unsigned int *RHS = (unsigned int *)malloc(sizeof(unsigned int) * (len + lenb + 6));
+    if (RHS == NULL)
+    {
+#ifdef HANDLE_MEMORY_EXCEPTION
+        HANDLE_MEMORY_EXCEPTION;
+#endif
+    }
+    RHS[0] = OP_LPRTH;
+    memcpy(RHS + 1, rhs, len * sizeof(unsigned int));
+    RHS[len + 1] = OP_RPRTH;
+    RHS[len + 2] = OP_ALTER;
+    RHS[len + 3] = OP_LPRTH;
+    memcpy(RHS + len + 4, b.rhs, lenb * sizeof(unsigned int));
+    RHS[len + lenb + 4] = OP_RPRTH;
+    RHS[len + lenb + 5] = OP_TRMNL;
+    return expr(NON_TERMINAL, RHS);
+}
+
+/**
+ * @brief Concatenation operator
+ * 
+ * @param b another RE
+ * @return A B
+ */
+expr expr::operator<<(const expr &b) const
+{
+    int len = 0, lenb = 0;
+    for (unsigned int *p = rhs; *p != OP_TRMNL; p++)
+        len++;
+    for (unsigned int *p = b.rhs; *p != OP_TRMNL; p++)
+        lenb++;
+    unsigned int *RHS = (unsigned int *)malloc(sizeof(unsigned int) * (len + lenb + 6));
+    if (RHS == NULL)
+    {
+#ifdef HANDLE_MEMORY_EXCEPTION
+        HANDLE_MEMORY_EXCEPTION;
+#endif
+    }
+    RHS[0] = OP_LPRTH;
+    memcpy(RHS + 1, rhs, len * sizeof(unsigned int));
+    RHS[len + 1] = OP_RPRTH;
+    RHS[len + 2] = OP_CNCAT;
+    RHS[len + 3] = OP_LPRTH;
+    memcpy(RHS + len + 4, b.rhs, lenb * sizeof(unsigned int));
+    RHS[len + lenb + 4] = OP_RPRTH;
+    RHS[len + lenb + 5] = OP_TRMNL;
+    return expr(NON_TERMINAL, RHS);
+}
+
+/**
+ * @brief Kleene Closure operation
+ * 
+ * @return A*
+ */
+expr expr::operator*() const
+{
+    int len = 0;
+    for (unsigned int *p = rhs; *p != OP_TRMNL; p++)
+        len++;
+    unsigned int *RHS = (unsigned int *)malloc(sizeof(unsigned int) * (len + 4));
+    if (RHS == NULL)
+    {
+#ifdef HANDLE_MEMORY_EXCEPTION
+        HANDLE_MEMORY_EXCEPTION;
+#endif
+    }
+    RHS[0] = OP_LPRTH;
+    memcpy(RHS + 1, rhs, len * sizeof(unsigned int));
+    RHS[len + 1] = OP_RPRTH;
+    RHS[len + 2] = OP_KLCLS;
+    RHS[len + 3] = OP_TRMNL;
+    return expr(NON_TERMINAL, RHS);
+}
+
+/**
+ * @brief Complementation
+ * 
+ * @return ~A
+ */
+expr expr::operator~() const
+{
+    int len = 0;
+    for (unsigned int *p = rhs; *p != OP_TRMNL; p++)
+        len++;
+    unsigned int *RHS = (unsigned int *)malloc(sizeof(unsigned int) * (len + 4));
+    if (RHS == NULL)
+    {
+#ifdef HANDLE_MEMORY_EXCEPTION
+        HANDLE_MEMORY_EXCEPTION;
+#endif
+    }
+    RHS[0] = OP_CMPLM;
+    RHS[1] = OP_LPRTH;
+    memcpy(RHS + 2, rhs, len * sizeof(unsigned int));
+    RHS[len + 2] = OP_RPRTH;
+    RHS[len + 3] = OP_TRMNL;
+    return expr(NON_TERMINAL, RHS);
 }
 
 /**
@@ -143,20 +285,22 @@ void dfa_table::copy(const dfa_table &b)
     s = b.s;
     if (row * col == 0)
     {
-        table == NULL;
+        table = NULL;
         f = NULL;
     }
     else
     {
         table = (unsigned int *)malloc(sizeof(unsigned int) * row * col);
+        sep = (unsigned int *)malloc(sizeof(unsigned int) * col);
         f = (bool *)malloc(sizeof(bool) * row);
-        if (table == NULL || f == NULL)
+        if (table == NULL || sep == NULL || f == NULL)
         {
 #ifdef HANDLE_MEMORY_EXCEPTION
             HANDLE_MEMORY_EXCEPTION;
 #endif
         }
         memcpy(table, b.table, sizeof(unsigned int) * row * col);
+        memcpy(sep, b.sep, sizeof(unsigned int) * col);
         memcpy(f, b.f, sizeof(bool) * row);
     }
 }
@@ -171,15 +315,25 @@ dfa_table::dfa_table(const dfa_table &b) { copy(b); }
 /**
  * @brief Construct a new DFA table from a DFA
  * 
- * @param dfa 
+ * @param dfa the DFA
+ * @param lsep the list of separation values
  */
-dfa_table::dfa_table(fa dfa)
+dfa_table::dfa_table(fa dfa, list<unsigned int> lsep)
 {
     row = dfa.g.size();
     col = dfa.sigma_range;
+    if (lsep.size() != col - 1)
+    {
+        table = sep = NULL;
+        f = NULL;
+        row = 1;
+        col = 0;
+        return;
+    }
     table = (unsigned int *)malloc(sizeof(unsigned int) * row * col);
+    sep = (unsigned int *)malloc(sizeof(unsigned int) * col);
     f = (bool *)malloc(sizeof(bool) * row);
-    if (table == NULL)
+    if (table == NULL || sep == NULL || f == NULL)
     {
 #ifdef HANDLE_MEMORY_EXCEPTION
         HANDLE_MEMORY_EXCEPTION;
@@ -201,7 +355,10 @@ dfa_table::dfa_table(fa dfa)
             else
             {
                 free(table);
-                table = NULL;
+                free(sep);
+                free(f);
+                table = sep = NULL;
+                f = NULL;
                 row = 1;
                 col = 0;
                 return;
@@ -213,6 +370,12 @@ dfa_table::dfa_table(fa dfa)
         dfa.f[i]->aux = (vertex_t *)1;
     for (int i = 0; i < row; i++)
         f[i] = dfa.g[i].aux == (vertex_t *)1;
+    if (col > 0)
+    {
+        for (int i = 0; i < col - 1; i++)
+            sep[i] = lsep[i];
+        sep[col - 1] = 0x110000;
+    }
 }
 
 /**
@@ -225,15 +388,9 @@ dfa_table::~dfa_table()
         free(table);
     if (f != NULL)
         free(f);
+    if (sep != NULL)
+        free(sep);
 }
-
-/**
- * @brief Operator []
- * 
- * @param idx the index
- * @return the first address of i-th row
- */
-unsigned int *dfa_table::operator[](int idx) { return &table[idx * col]; }
 
 /**
  * @brief Assignment function
@@ -252,25 +409,33 @@ dfa_table &dfa_table::operator=(const dfa_table &b)
 }
 
 /**
+ * @brief Operator []
+ * 
+ * @param idx the index
+ * @return the first address of idx-th row
+ */
+unsigned int *dfa_table::operator[](int idx) { return &table[idx * col]; }
+
+/**
  * @brief Get the number of rows
  * 
  * @return the number of rows
  */
-unsigned int dfa_table::get_row() { return row; }
+int dfa_table::get_row() { return row; }
 
 /**
  * @brief Get the number of columns
  * 
  * @return the number of columns
  */
-unsigned int dfa_table::get_col() { return col; }
+int dfa_table::get_col() { return col; }
 
 /**
  * @brief Get the initial state
  * 
  * @return the initial state
  */
-unsigned int dfa_table::get_start() { return s; }
+int dfa_table::get_start() { return s; }
 
 /**
  * @brief Get the final state
@@ -279,6 +444,34 @@ unsigned int dfa_table::get_start() { return s; }
  * @return whether i-th state is acceptable
  */
 bool dfa_table::is_acceptable(int idx) { return f[idx]; }
+
+/**
+ * @brief Get next state according to separation
+ * 
+ * @param state current state
+ * @param ch unicode character, from 0 to 0x10FFFF
+ * @return next state
+ */
+int dfa_table::next(int state, unsigned int ch)
+{
+    if (state > row || ch > 0x110000)
+        return UNDEFINED;
+    unsigned int symbol = 0;
+    if (ch >= sep[0])
+    {
+        int l = 0, r = col;
+        while (l + 1 < r)
+        {
+            int mid = (l + r) / 2;
+            if (sep[mid] <= ch)
+                l = mid;
+            else
+                r = mid;
+        }
+        symbol = l + 1;
+    }
+    return table[state * col + symbol];
+}
 
 /**
  * @brief Comparison between two vertices
@@ -352,14 +545,14 @@ fa &fa::operator<<=(fa &b)
 fa &fa::operator~()
 {
     g.add_vertex({id++, NON_TERMINAL});
-    for (int i = 0; i < sigma_range; i++)
+    for (unsigned int i = 0; i < sigma_range; i++)
         g.add_edge(g.top(), g.top(), {(unsigned int)i});
     for (int i = 0; i < g.size() - 1; i++)
     {
         vertex_t &v = g[i];
         v.sort();
         int j = v.size() - 1;
-        for (int k = sigma_range - 1; k >= 0; k--)
+        for (unsigned int k = sigma_range - 1; (int)k >= 0; k--)
             if (j >= 0 && v[j].data.value == k)
                 j--;
             else
@@ -378,7 +571,7 @@ fa &fa::operator~()
 }
 
 /**
- * @brief Kleen Closure operation
+ * @brief Kleene Closure operation
  * 
  * @return reference to this object after operation
  */
@@ -428,20 +621,24 @@ fa AtomicFA(unsigned int sigma, unsigned int sigma_range)
  * @param nfa the result nfa
  * @return whether succeeded
  */
-bool REToNFA(list<re> relist, fa &nfa, unsigned int symbol_range)
+bool REToNFA(list<expr> relist, fa &nfa, unsigned int symbol_range)
 {
     nfa = fa();
     for (int i = 0; i < relist.size(); i++)
     {
         unsigned int sigma_range = symbol_range;
-        for (unsigned int *p = relist[i].expression; *p != OP_TRMNL; p++)
+        for (unsigned int *p = relist[i].rhs; *p != OP_TRMNL; p++)
             if (*p < OP_LPRTH && (*p) + 1 > sigma_range)
                 sigma_range = (*p) + 1; // decide symbol range
+        int len = 0;
+        while (relist[i].rhs[len] != OP_TRMNL)
+            len++;
+        relist[i].rhs[len] = OP_RPRTH;
         list<fa> fa_stack;
         list<unsigned int> op_stack;
         op_stack.push_back(OP_LPRTH);
         int type = 0; // the next character type (operand: 0; operator: 1)
-        for (unsigned int *p = relist[i].expression; !op_stack.empty(); p++)
+        for (unsigned int *p = relist[i].rhs; !op_stack.empty(); p++)
         {
             if ((*p == OP_RPRTH || *p == OP_KLCLS || *p == OP_CNCAT || *p == OP_ALTER ? 1 : 0) != type)
                 return false;
@@ -457,7 +654,7 @@ bool REToNFA(list<re> relist, fa &nfa, unsigned int symbol_range)
             case OP_CNCAT:
             case OP_ALTER:
                 while (*p < op_stack.top() ||
-                       *p == op_stack.top() && *p != OP_CMPLM)
+                       (*p == op_stack.top() && *p != OP_CMPLM))
                 {
                     switch (op_stack.top())
                     {
@@ -491,11 +688,12 @@ bool REToNFA(list<re> relist, fa &nfa, unsigned int symbol_range)
             }
         }
         for (int j = 0; j < fa_stack.top().f.size(); j++)
-            fa_stack.top().f[j]->data.token = relist[i].token;
-        if (nfa.sigma_range == 0)
+            fa_stack.top().f[j]->data.token = relist[i].lhs;
+        if (nfa.f.empty())
             nfa = fa_stack.top();
         else
             nfa |= fa_stack.top();
+        relist[i].rhs[len] = OP_TRMNL;
     }
     NormalizeID(nfa);
     return true;
@@ -675,11 +873,8 @@ void NFAToDFA(fa nfa, fa &dfa)
     for (int i = 0; i < nfa.g.size(); i++)
     {
         dfa.g.add_vertex(nfa.g[i].data);
-        try
-        {
-            dfa.g[i].aux = (vertex_t *)new list<vertex_t *>;
-        }
-        catch (std::bad_alloc)
+        dfa.g[i].aux = (vertex_t *)new (std::nothrow) list<vertex_t *>;
+        if (dfa.g[i].aux == NULL)
         {
 #ifdef HANDLE_MEMORY_EXCEPTION
             HANDLE_MEMORY_EXCEPTION;
@@ -690,12 +885,9 @@ void NFAToDFA(fa nfa, fa &dfa)
     EpsilonClosure(nfa); // dfa.aux will store the subsets
     unsigned int size = nfa.g.size();
     const int hash_size = 1024;
-    list<hash_info> *aidx;
-    try
-    {
-        aidx = new list<hash_info>[hash_size];
-    }
-    catch (std::bad_alloc)
+    list<hash_subset_info> *aidx;
+    aidx = new (std::nothrow) list<hash_subset_info>[hash_size];
+    if (aidx == NULL)
     {
 #ifdef HANDLE_MEMORY_EXCEPTION
         HANDLE_MEMORY_EXCEPTION;
@@ -717,7 +909,8 @@ void NFAToDFA(fa nfa, fa &dfa)
         {
             for (int k = 0; k < subset[j]->size(); k++) // k-th edge in nfa[j]
             {
-                int symbol = (*subset[j])[k].data.value, l;
+                unsigned int symbol = (*subset[j])[k].data.value;
+                int l;
                 if (symbol == EPSILON)
                     continue;
                 for (l = 0; l < symbols.size(); l++)
@@ -748,11 +941,8 @@ void NFAToDFA(fa nfa, fa &dfa)
             if (k == aidx[hash].size())
             {
                 dfa.g.add_vertex({size++, NON_TERMINAL});
-                try
-                {
-                    dfa.g.top().aux = (vertex_t *)new list<vertex_t *>;
-                }
-                catch (std::bad_alloc)
+                dfa.g.top().aux = (vertex_t *)new (std::nothrow) list<vertex_t *>;
+                if (dfa.g.top().aux == NULL)
                 {
 #ifdef HANDLE_MEMORY_EXCEPTION
                     HANDLE_MEMORY_EXCEPTION;
@@ -760,7 +950,7 @@ void NFAToDFA(fa nfa, fa &dfa)
                 }
                 *(list<vertex_t *> *)dfa.g.top().aux = dest[j];
                 dfa.g.add_edge(i, dfa.g.size() - 1, {symbols[j]});
-                aidx[hash].append({(int)(dfa.g.size() - 1), dest[j]});
+                aidx[hash].append({dfa.g.size() - 1, dest[j]});
             }
         }
     }
@@ -833,6 +1023,7 @@ void MinimizeDFA(fa &dfa)
         {
             next.append(list<int>());
             next[i].append(group[i]);
+            next[i].append(dfa.g[i].data.token);
         }
         for (int i = 0; i < symbols.size(); i++) // the i-th symbol
         {

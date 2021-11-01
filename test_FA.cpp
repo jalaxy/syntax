@@ -94,7 +94,7 @@ int main()
     char s[10000];
     cin.getline(s, 10000);
     unsigned int a[10000];
-    for (int i = 0; i < strlen(s); i++)
+    for (int i = 0; i < (int)strlen(s); i++)
         switch (s[i])
         {
         case ' ':
@@ -125,12 +125,11 @@ int main()
             a[i] = s[i] - '0';
             break;
         }
-    a[strlen(s)] = OP_RPRTH;
-    a[strlen(s) + 1] = OP_TRMNL;
-    list<re> rl;
-    rl.append(re(a, 0));
+    a[strlen(s)] = OP_TRMNL;
+    list<expr> rl;
+    rl.append(expr(0, a));
     clock_t ts = clock();
-    REToNFA(rl, nfa);
+    REToNFA(rl, nfa, 0x110000);
     clock_t t1 = clock() - ts;
     print(nfa);
     ts = clock();
@@ -141,7 +140,16 @@ int main()
     MinimizeDFA(dfa);
     clock_t t3 = clock() - ts;
     print(dfa);
-    print(dfa_table(dfa));
+    // unsigned int sep[] = {'0', '9' + 1, 'A', 'Z' + 1, 'a', 'z' + 1};
+    // // 1 -> number, 3 -> uppercase, 5 -> lowercase
+    // dfa_table t(dfa, sep);
+    // print(dfa_table(dfa, sep));
+    // while (!cin.fail())
+    // {
+    //     int ch;
+    //     cin >> ch;
+    //     cout << char(ch) << " " << t.next(0, ch) << endl;
+    // }
     cout << "Elapsed time: " << t1 << " ms : " << t2 << "ms : " << t3 << " ms\n";
     return 0;
 }

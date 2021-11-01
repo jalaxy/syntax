@@ -14,17 +14,21 @@
 #include "graph.h"
 #include "list.h"
 #include <cstring>
+#include <malloc.h>
 
+#define UNDEFINED ((int)0x7fffffff)             // undefined transition in DFA table
 #define NON_TERMINAL ((unsigned int)0xffffffff) // non-terminal state token
-#define UNDEFINED ((unsigned int)0xffffffff)    // undefined transition in DFA table
 #define EPSILON ((unsigned int)0xffffffff)      // value representing epsilon
 #define OP_TRMNL ((unsigned int)0xfffffffe)     // RE string terminal
 #define OP_KLCLS ((unsigned int)0xfffffffd)     // '*'
-#define OP_CMPLM ((unsigned int)0xfffffffc)     // '~'
-#define OP_CNCAT ((unsigned int)0xfffffffb)     // '.'
-#define OP_ALTER ((unsigned int)0xfffffffa)     // '|'
-#define OP_RPRTH ((unsigned int)0xfffffff9)     // ')'
-#define OP_LPRTH ((unsigned int)0xfffffff8)     // '('
+#define OP_PTCLS ((unsigned int)0xfffffffc)     // '+'
+#define OP_OPTNL ((unsigned int)0xfffffffb)     // '?'
+#define OP_CMPLM ((unsigned int)0xfffffffa)     // '~'
+#define OP_CNCAT ((unsigned int)0xfffffff9)     // '.'
+#define OP_ALTER ((unsigned int)0xfffffff8)     // '|'
+#define OP_MINUS ((unsigned int)0xfffffff7)     // '-'
+#define OP_RPRTH ((unsigned int)0xfffffff6)     // ')'
+#define OP_LPRTH ((unsigned int)0xfffffff5)     // '('
 
 struct edge_info
 {
@@ -40,17 +44,23 @@ struct vertex_info
 typedef vertex<vertex_info, edge_info> vertex_t;
 typedef edge<vertex_info, edge_info> edge_t;
 
-class re
+class expr
 {
 public:
-    // an extra right parenthesis and a terminal are needed
-    // which is RE -> RE)#
-    unsigned int *expression;
-    unsigned int token;
-    re();
-    re(const re &b);
-    re(const unsigned int *EXPR, unsigned int TOKEN = NON_TERMINAL);
-    ~re();
+    // an extra terminal are needed
+    // which is EXPR -> EXPR# (# -> OP_TRMNL)
+    unsigned int lhs;
+    unsigned int *rhs;
+    expr(const expr &b);
+    expr(unsigned int LHS);
+    expr(unsigned int LHS, const unsigned int *RHS);
+    ~expr();
+    expr &operator=(const expr &b);
+    bool operator<(const expr &b) const;
+    expr operator|(const expr &b) const;
+    expr operator<<(const expr &b) const;
+    expr operator*() const;
+    expr operator~() const;
 };
 
 class fa
@@ -75,24 +85,27 @@ public:
 class dfa_table
 {
 private:
-    unsigned int *table, row, col;
+    // [0, 0x110000) -> [0, sep[0]), [sep[0], sep[1]), ..., [sep[col - 2], sep[col - 1])
+    // sep[col - 1] = 0x110000
+    unsigned int *table, *sep;
+    int row, col, s;
     bool *f;
-    unsigned int s;
     void copy(const dfa_table &b);
 
 public:
     dfa_table(const dfa_table &b);
-    dfa_table(fa dfa);
+    dfa_table(fa dfa, list<unsigned int> lsep);
     ~dfa_table();
-    unsigned int *operator[](int idx);
-    unsigned int get_row();
-    unsigned int get_col();
-    unsigned int get_start();
-    bool is_acceptable(int idx);
     dfa_table &operator=(const dfa_table &b);
+    unsigned int *operator[](int idx);
+    int get_row();
+    int get_col();
+    int get_start();
+    bool is_acceptable(int idx);
+    int next(int state, unsigned int ch);
 };
 
-struct hash_info
+struct hash_subset_info
 {
     int idx;
     list<vertex_t *> subset;
@@ -105,6 +118,6 @@ bool operator<(const edge_info &a, const edge_info &b);
 
 void NormalizeID(fa &nfa);
 fa AtomicFA(unsigned int sigma, unsigned sigma_range = 0);
-bool REToNFA(list<re> relist, fa &nfa, unsigned int symbol_range = 0);
+bool REToNFA(list<expr> relist, fa &nfa, unsigned int symbol_range = 0);
 void NFAToDFA(fa nfa, fa &dfa);
 void MinimizeDFA(fa &dfa);

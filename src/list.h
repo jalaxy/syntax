@@ -36,14 +36,14 @@ private:
      */
     void create()
     {
-        head.p_data = (T *)malloc(sizeof(size_t));
+        head.p_data = (T *)malloc(sizeof(int));
         if (head.p_data == NULL)
         {
 #ifdef HANDLE_MEMORY_EXCEPTION
             HANDLE_MEMORY_EXCEPTION;
 #endif
         }
-        *(size_t *)head.p_data = 0;
+        *(int *)head.p_data = 0;
         head.next = head.pre = NULL;
         p_rear = &head;
         array = NULL;
@@ -72,7 +72,7 @@ private:
      */
     void destroy()
     {
-        free((size_t *)head.p_data);
+        free((int *)head.p_data);
         llist<T> *p = head.next;
         while (p != NULL)
         {
@@ -99,7 +99,7 @@ private:
             p_rear = p->pre;
         delete p->p_data;
         free(p);
-        (*(size_t *)head.p_data)--;
+        (*(int *)head.p_data)--;
         out_of_date = true;
     }
 
@@ -118,11 +118,8 @@ private:
             HANDLE_MEMORY_EXCEPTION;
 #endif
         }
-        try
-        {
-            p->p_data = new T(x);
-        }
-        catch (std::bad_alloc)
+        p->p_data = new (std::nothrow) T(x);
+        if (p->p_data == NULL)
         {
 #ifdef HANDLE_MEMORY_EXCEPTION
             HANDLE_MEMORY_EXCEPTION;
@@ -135,7 +132,7 @@ private:
             p->next->pre = p;
         if (pos == p_rear)
             p_rear = p;
-        (*(size_t *)head.p_data)++;
+        (*(int *)head.p_data)++;
         out_of_date = true;
     }
 
@@ -147,9 +144,9 @@ private:
     {
         if (array != NULL)
             free(array);
-        array = (llist<T> **)malloc(sizeof(llist<T> *) * *(size_t *)head.p_data);
+        array = (llist<T> **)malloc(sizeof(llist<T> *) * *(int *)head.p_data);
         llist<T> *p = head.next;
-        for (int i = 0; i < *(size_t *)head.p_data; i++, p = p->next)
+        for (int i = 0; i < *(int *)head.p_data; i++, p = p->next)
             array[i] = p;
         out_of_date = false;
     }
@@ -179,14 +176,14 @@ public:
      * 
      * @return the size of the list
      */
-    size_t size() const { return *(size_t *)head.p_data; }
+    int size() const { return *(int *)head.p_data; }
 
     /**
      * @brief Whether this list is empty
      * 
      * @return empty or not
      */
-    bool empty() const { return *(size_t *)head.p_data == 0; }
+    bool empty() const { return *(int *)head.p_data == 0; }
 
     /**
      * @brief Remove the idx-th element
@@ -276,7 +273,7 @@ public:
      */
     void clear()
     {
-        while (*(size_t *)head.p_data > 0)
+        while (*(int *)head.p_data > 0)
             remove(0);
     }
 
@@ -369,8 +366,8 @@ public:
         p_rear = pb->p_rear;
         pb->head.next = NULL;
         pb->p_rear = &pb->head;
-        *(size_t *)head.p_data += *(size_t *)pb->head.p_data;
-        *(size_t *)pb->head.p_data = 0;
+        *(int *)head.p_data += *(int *)pb->head.p_data;
+        *(int *)pb->head.p_data = 0;
         out_of_date = true;
         pb->out_of_date = true;
     }
@@ -422,9 +419,9 @@ public:
      */
     list<T> operator+(const list<T> &b) const
     {
-        list<T> c(*this);
-        for (int i = 0; i < b.size(); i++)
-            c.append(((list<T> &)b)[i]);
+        list<T> c(*this), d(b);
+        for (int i = 0; i < d.size(); i++)
+            c.append(d[i]);
         return c;
     }
 
@@ -448,8 +445,9 @@ public:
      */
     list<T> &operator+=(const list<T> &b)
     {
-        for (int i = 0; i < b.size(); i++)
-            append(((list<T> &)b)[i]);
+        list<T> c(b);
+        for (int i = 0; i < c.size(); i++)
+            append(c[i]);
         return *this;
     }
 

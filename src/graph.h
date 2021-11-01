@@ -53,11 +53,11 @@ public:
         return c;
     }
     vertex<Tv, Te> &operator[](int i) { return vertices[i]; }
-    size_t size() const { return vertices.size(); }
+    int size() const { return vertices.size(); }
     vertex<Tv, Te> &top() const { return vertices.top(); }
     void sort() { vertices.sort(0, vertices.size() - 1); }
     void merge(graph &b) { vertices.merge(&b.vertices); }
-    void mapping(const graph<Tv, Te> &b, unsigned int base) const
+    void mapping(const graph<Tv, Te> &b, int base) const
     {
         for (int i = 0; i < size() && base + i < ((graph &)b).vertices.size(); i++)
             ((graph &)*this).vertices[i].aux = &((graph &)b).vertices[base + i];
@@ -106,7 +106,7 @@ public:
         edges = list<edge<Tv, Te>>();
         aux = NULL;
     }
-    size_t size() const { return edges.size(); }
+    int size() const { return edges.size(); }
     void sort() { edges.sort(0, edges.size() - 1); }
     void merge(vertex &b) { edges.merge(&b.edges); }
     void set_reduce() { edges.set_reduce(); }

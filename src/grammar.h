@@ -1,25 +1,76 @@
-/**
- * @file gramma.h
+/****************************************************************
+ * @file grammar.h
  * @author Jiang, Xingyu (chinajxy@outlook.com)
- * @brief Data structures and functions to process gramma
+ * @brief Data structures and functions to process grammar
  * @version 0.1
  * @date 2021-10-24
  * 
  * @copyright Copyright (c) 2021
  * 
- */
+ ****************************************************************/
 
 #pragma once
 
-class ebnf
+#include "list.h"
+#include "FA.h"
+#include <cstdio>
+#include <windows.h>
+
+#define HASH_SZ 1024
+#define TERMINAL_BOUND ((unsigned int)0x80000000)
+#define LL1_PARSING_ERROR ((unsigned int)0xffffffff)
+
+struct prod
+{
+    unsigned int variable;               // id of the variable
+    list<list<unsigned int>> expression; // concatenate of the elements
+};
+
+struct parsing_tree
+{
+    prod production;
+    list<parsing_tree> subtree;
+};
+
+class grammar
 {
 public:
-    unsigned int varible;
-    unsigned int *expression;
-    ebnf();
-    ebnf(const ebnf &);
-    ~ebnf();
+    list<prod> productions;
+    prod *s;
 };
+
+struct hash_symbol_info
+{
+    bool regular;
+    int idx;
+    unsigned int symbol;
+};
+
+class ll1_parsing_table
+{
+private:
+    list<unsigned int> *table;
+    list<hash_symbol_info> *aidx;
+    int row, col, s;
+    void copy(const ll1_parsing_table &b);
+    void calc_first(grammar &g, list<unsigned int> *first, unsigned int variable);
+
+public:
+    ll1_parsing_table(const ll1_parsing_table &b);
+    ll1_parsing_table(grammar g);
+    ~ll1_parsing_table();
+    const ll1_parsing_table &operator=(const ll1_parsing_table &b);
+    const hash_symbol_info *query_symbol(unsigned int symbol);
+    int get_row();
+    int get_col();
+    int get_start();
+    list<unsigned int> *operator[](int idx);
+};
+
+int ReadEBNFFromFile(FILE *fp, UINT code_page, list<expr> &ebnflist, list<expr> &relist,
+                     list<unsigned int> &sep, list<list<unsigned int>> &names);
+bool EBNFToGrammar(list<expr> ebnflist, list<expr> &relist, unsigned int s, grammar &g,
+                   bool detect_regular = true);
 
 // Extended Backus-Naur Form (EBNF) notation, from XML specification
 // Reference link: https://www.w3.org/TR/xml/
