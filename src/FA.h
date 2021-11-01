@@ -1,7 +1,7 @@
 /****************************************************************
- * @file FA.cpp
+ * @file FA.h
  * @author Jiang, Xingyu (chinajxy@outlook.com)
- * @brief Functions to process Finite Automata
+ * @brief Data structures and functions to process finite automata
  * @version 0.1
  * @date 2021-10-15
  * 
