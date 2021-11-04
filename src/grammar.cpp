@@ -1,6 +1,6 @@
 /****************************************************************
  * @file grammar.cpp
- * @author Jiang, Xingyu (chinajxy@outlook.com)
+ * @author Name (username@domain.com)
  * @brief Function definitions of grammar.h
  * @version 0.1
  * @date 2021-10-24
@@ -70,6 +70,7 @@ ll1_parsing_table::ll1_parsing_table(grammar g)
     re_sym.set_reduce();
     for (int i = 0; i < re_sym.size(); i++)
         aidx[re_sym[i] % HASH_SZ].append({true, col++, re_sym[i]});
+    aidx[LL1_PARSING_TERMINAL % HASH_SZ].append({true, col++, LL1_PARSING_TERMINAL});
     table = new (std::nothrow) list<unsigned int>[row * col];
     if (table == NULL)
     {
@@ -94,6 +95,12 @@ ll1_parsing_table::ll1_parsing_table(grammar g)
     // B -> beta A alpha    =>  FOLLOW(A) |= FIRST(alpha) | (epsilon in alpha ? FOLLOW(B))
     // B -> beta A          =>  FOLLOW(A) |= FOLLOW(B)
     bool finished = false;
+    for (int i = 0; i < aidx[g.s->variable % HASH_SZ].size(); i++)
+        if (aidx[g.s->variable % HASH_SZ][i].symbol == g.s->variable)
+        {
+            follow[aidx[g.s->variable % HASH_SZ][i].idx].append(LL1_PARSING_TERMINAL);
+            break;
+        }
     while (!finished)
     {
         finished = true;
@@ -177,7 +184,7 @@ ll1_parsing_table::ll1_parsing_table(grammar g)
         }
     delete[] first;
     delete[] follow;
-    s = query_symbol(g.s->variable)->idx;
+    s = g.s->variable;
 }
 
 /**
@@ -276,7 +283,7 @@ int ll1_parsing_table::get_col() { return col; }
  * 
  * @return int 
  */
-int ll1_parsing_table::get_start() { return s; }
+unsigned int ll1_parsing_table::get_start() { return s; }
 
 /**
  * @brief Get the element of parsing table
@@ -303,6 +310,15 @@ const ll1_parsing_table &ll1_parsing_table::operator=(const ll1_parsing_table &b
 }
 
 /**
+ * @brief Comparison between two productions
+ * 
+ * @param a one production
+ * @param b the other production
+ * @return whether the lhs of a is less than of b
+ */
+bool operator<(const prod &a, const prod &b) { return a.variable < b.variable; }
+
+/**
  * @brief Recursion part of conversion from EBNF to grammar
  * 
  * @param ebnflist the list of ebnf expressions
@@ -323,27 +339,25 @@ bool EBNFToGrammarRecursion(
         return true;
     g.productions[idx].expression.pop_back();
     list<unsigned int> idx_stack;
-    int len = 0;
-    while (ebnflist[idx].rhs[len] != OP_TRMNL)
-        len++;
-    ebnflist[idx].rhs[len] = OP_RPRTH; // before restored, this ENBF cannot be copied!
+    ebnflist[idx].rhs.append(OP_RPRTH); // before restored, this ENBF cannot be copied!
     list<unsigned int> type_stack;
     list<unsigned int> op_stack;
     op_stack.push_back(OP_LPRTH);
     int op_type = 0; // the next character type (operand: 0; operator: 1)
-    for (unsigned int *p = ebnflist[idx].rhs; !op_stack.empty(); p++)
+    for (int i = 0; i < ebnflist[idx].rhs.size(); i++)
     {
-        if ((*p == OP_RPRTH || *p == OP_KLCLS || *p == OP_CNCAT || *p == OP_ALTER ||
-                     *p == OP_PTCLS || *p == OP_OPTNL || *p == OP_MINUS
+        unsigned int ch = ebnflist[idx].rhs[i];
+        if ((ch == OP_RPRTH || ch == OP_KLCLS || ch == OP_CNCAT || ch == OP_ALTER ||
+                     ch == OP_PTCLS || ch == OP_OPTNL || ch == OP_MINUS
                  ? 1
                  : 0) != op_type)
             return false;
-        op_type = *p == OP_LPRTH || *p == OP_CNCAT || *p == OP_ALTER ||
-                          *p == OP_CMPLM || *p == OP_MINUS
+        op_type = ch == OP_LPRTH || ch == OP_CNCAT || ch == OP_ALTER ||
+                          ch == OP_CMPLM || ch == OP_MINUS
                       ? 0
                       : 1;
-        int i;
-        switch (*p)
+        int j;
+        switch (ch)
         {
         case OP_LPRTH:
             op_stack.push_back(OP_LPRTH);
@@ -356,8 +370,8 @@ bool EBNFToGrammarRecursion(
         case OP_CNCAT:
         case OP_ALTER:
         case OP_MINUS:
-            while (*p < op_stack.top() ||
-                   (*p == op_stack.top() && *p != OP_CMPLM))
+            while (ch < op_stack.top() ||
+                   (ch == op_stack.top() && ch != OP_CMPLM))
             {
                 switch (op_stack.top())
                 {
@@ -383,6 +397,7 @@ bool EBNFToGrammarRecursion(
                         aidx[g.productions.top().variable % HASH_SZ].append(
                             {false, g.productions.size() - 1, g.productions.top().variable});
                         idx_stack.top() = g.productions.size() - 1;
+                        type_stack.top() = 2;
                     }
                     break;
                 case OP_PTCLS:
@@ -410,13 +425,15 @@ bool EBNFToGrammarRecursion(
                         aidx[g.productions.top().variable % HASH_SZ].append(
                             {false, g.productions.size() - 1, g.productions.top().variable});
                         idx_stack.top() = g.productions.size() - 1;
+                        type_stack.top() = 2;
                     }
                     break;
                 case OP_OPTNL:
                     if (type_stack.top() == 3 && detect_regular)
                     {
-                        unsigned int ep[] = {EPSILON, OP_TRMNL};
-                        relist.append(relist[idx_stack.top()] | expr(NON_TERMINAL, ep));
+                        list<unsigned int> ep;
+                        ep.append(EPSILON);
+                        relist.append(relist[idx_stack.top()] | expr({NON_TERMINAL, ep}));
                         relist.top().lhs = id++;
                         aidx[relist.top().lhs % HASH_SZ].append(
                             {true, relist.size() - 1, relist.top().lhs});
@@ -433,10 +450,11 @@ bool EBNFToGrammarRecursion(
                         aidx[g.productions.top().variable % HASH_SZ].append(
                             {false, g.productions.size() - 1, g.productions.top().variable});
                         idx_stack.top() = g.productions.size() - 1;
+                        type_stack.top() = 2;
                     }
                     break;
                 case OP_CMPLM:
-                    if (type_stack.top() == 3 && type_stack.undertop() == 3 && detect_regular)
+                    if (type_stack.top() == 3 && detect_regular)
                     {
                         relist.append(~relist[idx_stack.top()]);
                         relist.top().lhs = id++;
@@ -529,29 +547,29 @@ bool EBNFToGrammarRecursion(
                 }
                 op_stack.pop_back();
             }
-            if (*p == OP_RPRTH)
+            if (ch == OP_RPRTH)
                 op_stack.pop_back();
             else
-                op_stack.push_back(*p);
+                op_stack.push_back(ch);
             break;
         default:
-            for (i = 0; i < aidx[*p % HASH_SZ].size(); i++)
-                if (aidx[*p % HASH_SZ][i].symbol == *p)
+            for (j = 0; j < aidx[ch % HASH_SZ].size(); j++)
+                if (aidx[ch % HASH_SZ][j].symbol == ch)
                     break;
-            if (i == aidx[*p % HASH_SZ].size())
+            if (j == aidx[ch % HASH_SZ].size())
                 return false; // not found
-            if (!aidx[*p % HASH_SZ][i].regular)
+            if (!aidx[ch % HASH_SZ][j].regular)
                 if (!EBNFToGrammarRecursion(
-                        ebnflist, relist, g, aidx[*p % HASH_SZ][i].idx, id, aidx, detect_regular))
+                        ebnflist, relist, g, aidx[ch % HASH_SZ][j].idx, id, aidx, detect_regular))
                     return false;
-            if (aidx[*p % HASH_SZ][i].regular) // production found
+            if (aidx[ch % HASH_SZ][j].regular) // production found
             {
-                idx_stack.push_back(aidx[*p % HASH_SZ][i].idx); // index of relist
+                idx_stack.push_back(aidx[ch % HASH_SZ][j].idx); // index of relist
                 type_stack.push_back(3);                        // regular
             }
             else
             {
-                idx_stack.push_back(aidx[*p % HASH_SZ][i].idx); // index of production
+                idx_stack.push_back(aidx[ch % HASH_SZ][j].idx); // index of production
                 type_stack.push_back(2);                        // context-free
             }
             break;
@@ -559,13 +577,17 @@ bool EBNFToGrammarRecursion(
     }
     if (!detect_regular || g.productions[idx].variable == g.s->variable)
     {
-        if (type_stack.top() == 3)
+        if (type_stack.top() == 3 && g.productions[idx].variable != g.s->variable)
         {
             g.productions[idx].expression.append(list<unsigned int>());
             g.productions[idx].expression.top().append(relist[idx_stack.top()].lhs);
         }
         else if (!detect_regular)
-            g.productions[idx].expression = g.productions[idx_stack.top()].expression;
+        {
+            // g.productions[idx].expression = g.productions[idx_stack.top()].expression;
+            g.productions[idx].expression.append(list<unsigned int>());
+            g.productions[idx].expression.top().append(g.productions[idx_stack.top()].variable);
+        }
     }
     else if (type_stack.top() == 3)
     {
@@ -577,10 +599,10 @@ bool EBNFToGrammarRecursion(
                 aidx[symbol % HASH_SZ][i].regular = true;
                 break;
             }
-        relist.append(expr(symbol, relist[idx_stack.top()].rhs));
+        relist.append({symbol, relist[idx_stack.top()].rhs});
         symbol = EPSILON;
     }
-    ebnflist[idx].rhs[len] = OP_TRMNL;
+    ebnflist[idx].rhs.pop_back();
     if (detect_regular)
     {
         g.productions[idx].expression.append(list<unsigned int>());
@@ -647,7 +669,7 @@ void SingleSubstitution(
 void Traverse(grammar &g, list<expr> &relist, list<hash_symbol_info> *aidx,
               unsigned int symbol, bool *v_g, bool *v_re)
 {
-    int i, j;
+    int i = 0, j;
     for (j = 0; j < aidx[symbol % HASH_SZ].size(); j++)
         if (aidx[symbol % HASH_SZ][j].symbol == symbol)
         {
@@ -675,8 +697,9 @@ void Traverse(grammar &g, list<expr> &relist, list<hash_symbol_info> *aidx,
 bool EBNFToGrammar(list<expr> ebnflist, list<expr> &relist, unsigned int s, grammar &g,
                    bool detect_regular)
 {
-    unsigned int ep[] = {EPSILON, OP_TRMNL};
-    relist.append(expr(EPSILON, ep));
+    list<unsigned int> ep;
+    ep.append(EPSILON);
+    relist.append({EPSILON, ep});
     g = grammar();
     ebnflist.sort(0, ebnflist.size() - 1);
     unsigned int id_start = 0, id;
@@ -698,9 +721,9 @@ bool EBNFToGrammar(list<expr> ebnflist, list<expr> &relist, unsigned int s, gram
         }
         if (ebnflist[i].lhs + 1 > id_start)
             id_start = ebnflist[i].lhs + 1;
-        for (unsigned int *p = ebnflist[i].rhs; *p != OP_TRMNL; p++)
-            if (*p < OP_LPRTH && (*p) + 1 > id_start)
-                id_start = (*p) + 1;
+        for (int j = 0; j < ebnflist[i].rhs.size(); j++)
+            if (ebnflist[i].rhs[j] < OP_LPRTH && ebnflist[i].rhs[j] + 1 > id_start)
+                id_start = ebnflist[i].rhs[j] + 1;
     }
     for (int i = 0; i < relist.size(); i++)
         if (relist[i].lhs + 1 > id_start)
@@ -723,7 +746,8 @@ bool EBNFToGrammar(list<expr> ebnflist, list<expr> &relist, unsigned int s, gram
         for (int i = 0; i < ebnflist.size() && suc; i++)
             suc &= EBNFToGrammarRecursion(ebnflist, relist, g, i, id, aidx, true);
     for (int i = 0; i < ebnflist.size() && suc; i++)
-        suc &= EBNFToGrammarRecursion(ebnflist, relist, g, i, id, aidx, false);
+        if (g.productions[i].variable != EPSILON)
+            suc &= EBNFToGrammarRecursion(ebnflist, relist, g, i, id, aidx, false);
     for (int i = 0; i < g.productions.size(); i++)
         for (int j = 0; j < g.productions[i].expression.size(); j++)
             for (int k = 0; k < g.productions[i].expression[j].size(); k++)
@@ -766,6 +790,28 @@ bool EBNFToGrammar(list<expr> ebnflist, list<expr> &relist, unsigned int s, gram
     free(vstd_g);
     free(vstd_re);
     delete[] aidx;
+    // because the FA lexical rules cannot identify empty string, it needs to
+    // be rolled back to grammars
+    for (int i = 0; i < relist.size(); i++)
+    {
+        list<expr> one;
+        one.append(relist[i]);
+        fa nfa, dfa;
+        REToNFA(one, nfa);
+        NFAToDFA(nfa, dfa);
+        for (int j = 0; j < dfa.f.size(); j++)
+            if (dfa.f[j] == dfa.s) // accept epsilon
+            {
+                g.productions.append({relist[i].lhs, list<list<unsigned int>>()});
+                relist[i].lhs = id++;
+                g.productions.top().expression.append(list<unsigned int>());
+                g.productions.top().expression.top().append(relist[i].lhs);
+                g.productions.top().expression.append(list<unsigned int>());
+                break;
+            }
+    }
+    relist.sort(0, relist.size() - 1);
+    g.productions.sort(0, g.productions.size() - 1);
     return suc;
 }
 
@@ -773,15 +819,16 @@ bool EBNFToGrammar(list<expr> ebnflist, list<expr> &relist, unsigned int s, gram
  * @brief Get the next unsigned integer
  * 
  * @param str the string
+ * @param wsz the size of the string
  * @param i start index
  * @param num integer output
  * @return index of position after this number
  */
-int GetInt(list<unsigned int> &str, int i, unsigned short &num)
+int GetInt(wchar_t *str, int wsz, int i, unsigned short &num)
 {
     int j = i;
     num = 0;
-    while (j < str.size() &&
+    while (j < wsz &&
            ((str[j] >= L'0' && str[j] <= L'9') ||
             (str[j] >= L'a' && str[j] <= L'f') ||
             (str[j] >= L'A' && str[j] <= L'F')))
@@ -827,71 +874,70 @@ int DetermineTerminal(list<unsigned int> &sep, unsigned int ch)
 }
 
 /**
+ * @brief Hash function
+ * 
+ * @param l the string
+ * @return hash value
+ */
+int h(list<unsigned int> &l)
+{
+    int ans = 0;
+    for (int i = 0; i < l.size(); i++)
+        ans = (ans * 0x80 + l[i]) % HASH_SZ;
+    return ans;
+}
+
+/**
  * @brief Read an EBNF from a file
  * 
- * @param fp the file pointer
+ * @param wbuf the wide character string
  * @param ebnflist result EBNF list
+ * @param start result start variable
  * @param relist result regular language list
  * @param sep separations of UNICODE characters
  * @param names the corresponding name string of each index
  * 
  * @return the line number
  */
-int ReadEBNFFromFile(FILE *fp, UINT code_page, list<expr> &ebnflist, list<expr> &relist,
-                     list<unsigned int> &sep, list<list<unsigned int>> &names)
+int ReadEBNFFromString(wchar_t *wbuf, list<expr> &ebnflist, unsigned int &start, list<expr> &relist,
+                       list<unsigned int> &sep, list<list<unsigned int>> &names)
 {
-    fseek(fp, 0, SEEK_END);
-    int sz = ftell(fp);
-    char *buffer = (char *)malloc(sz);
-    if (buffer == NULL)
-    {
-#ifdef HANDLE_MEMORY_EXCEPTION
-        HANDLE_MEMORY_EXCEPTION;
-#endif
-    }
-    rewind(fp);
-    fread(buffer, 1, sz, fp);
-    int wsz = MultiByteToWideChar(code_page, 0, buffer, sz, NULL, 0);
-    wchar_t *wbuffer = (wchar_t *)malloc(wsz * sizeof(wchar_t));
-    if (wbuffer == NULL)
-    {
-#ifdef HANDLE_MEMORY_EXCEPTION
-        HANDLE_MEMORY_EXCEPTION;
-#endif
-    }
-    MultiByteToWideChar(code_page, 0, buffer, sz, wbuffer, wsz);
-    free(buffer);
-    list<unsigned int> lstr; // list implementation of the wide string
-    for (int i = 0; i < wsz; i++)
-        lstr.append(wbuffer[i]); // to insert more conveniently
-    free(wbuffer);
-    int i = 0, j = 0, line = 1;
+    int wsz = 0;
+    while (wbuf[wsz] != L'\0')
+        wsz++;
+    // some extra space is reserved for inline-RE ordering (0 - sz_rsvd)
+    int i = 0, line = 1, sz_rsvd = 0;
+    names = list<list<unsigned int>>();
     while (i < wsz)
-        if (lstr[i] == L'[')
+        if (wbuf[i] == L'[')
         {
             i++;
-            if (i < wsz && lstr[i] == L'^')
+            if (i < wsz && wbuf[i] == L'^')
                 i++;
             int j = i;
-            while (j < wsz && lstr[j] != L'\n' && lstr[j] != L']')
+            while (j < wsz && wbuf[j] != L'\n' && wbuf[j] != L']')
                 j++;
-            if (j == wsz || lstr[j] == L'\n')
+            if (j == wsz || wbuf[j] == L'\n')
                 return line;
+            names.append(list<unsigned int>());
+            for (int k = i - 1; k <= j; k++)
+                names[sz_rsvd].append(wbuf[k]);
+            sz_rsvd++;
             int k = i;
             while (k < j)
             {
                 unsigned short l, r;
-                l = lstr[k];
-                if (k + 1 < j && lstr[k] == L'#' && lstr[k + 1] == L'x')
-                    k = GetInt(lstr, k + 2, l);
+                l = wbuf[k];
+                if (k + 1 < j && wbuf[k] == L'#' && wbuf[k + 1] == L'x')
+                    k = GetInt(wbuf, wsz, k + 2, l);
                 else
                     k++;
-                if (lstr[k] == L'-')
+                if (wbuf[k] == L'-')
                 {
                     k++;
-                    r = lstr[k];
-                    if (k + 1 < j && lstr[k] == L'#' && lstr[k + 1] == L'x')
-                        k = GetInt(lstr, k + 2, r);
+                    r = wbuf[k];
+                    if (k + 1 < j && wbuf[k] == L'#' && wbuf[k + 1] == L'x')
+                        k = GetInt(wbuf, wsz, k + 2, r);
                     else
                         k++;
                 }
@@ -902,119 +948,156 @@ int ReadEBNFFromFile(FILE *fp, UINT code_page, list<expr> &ebnflist, list<expr> 
             }
             i = j + 1;
         }
-        else if (lstr[i] == L'#')
-            if (i + 1 < wsz && lstr[i + 1] == L'x')
+        else if (wbuf[i] == L'#')
+            if (i + 1 < wsz && wbuf[i + 1] == L'x')
             {
                 unsigned short num;
-                i = GetInt(lstr, i + 2, num);
+                int j = GetInt(wbuf, wsz, i + 2, num);
                 sep.append(num);
                 sep.append(num + 1);
+                names.append(list<unsigned int>());
+                for (int k = i; k < j; k++)
+                    names[sz_rsvd].append(wbuf[k]);
+                sz_rsvd++;
+                i = j;
             }
             else
                 return line;
-        else if (lstr[i] == '\'' || lstr[i] == '"')
+        else if (wbuf[i] == '\'' || wbuf[i] == '"')
         {
             i++;
             int j = i;
-            while (j < wsz && lstr[j] != L'\n' && lstr[j] != lstr[i - 1])
+            while (j < wsz && wbuf[j] != L'\n' && wbuf[j] != wbuf[i - 1])
                 j++;
-            if (j < wsz && lstr[j] != L'\n')
+            if (j < wsz && wbuf[j] != L'\n')
                 for (int k = i; k < j; k++)
                 {
-                    sep.append(lstr[k]);
-                    sep.append(lstr[k] + 1);
+                    sep.append(wbuf[k]);
+                    sep.append(wbuf[k] + 1);
                 }
             else
                 return line;
+            names.append(list<unsigned int>());
+            for (int k = i - 1; k <= j; k++)
+                names[sz_rsvd].append(wbuf[k]);
+            sz_rsvd++;
             i = j + 1;
         }
-        else if (lstr[i++] == '\n')
+        else if (wbuf[i++] == '\n')
             line++;
     sep.set_reduce();
-    i = j = line = 0;
-    int id = 0;
-    names = list<list<unsigned int>>();
-    while (i < wsz && (lstr[i] == L'\n' || lstr[i] == L' ' ||
-                       lstr[i] == L'\t' || lstr[i] == L'\r'))
+    start = sz_rsvd;
+    int j = i = line = 0;
+    while (i < wsz && (wbuf[i] == L'\n' || wbuf[i] == L' ' ||
+                       wbuf[i] == L'\t' || wbuf[i] == L'\r'))
         i++;
     while (i < wsz)
     {
         line++;
         j = i;
-        while (j < wsz && lstr[j] != L'\n')
+        while (j < wsz && wbuf[j] != L'\n')
             j++;
         // [i, j) is one EBNF expression
         int k = i;
-        while (k + 2 < wsz && !(lstr[k] == ':' && lstr[k + 1] == ':' && lstr[k + 2] == '='))
+        while (k + 2 < wsz && !(wbuf[k] == ':' && wbuf[k + 1] == ':' && wbuf[k + 2] == '='))
             k++;
         if (k + 2 == wsz)
             return line;
         names.append(list<unsigned int>());
         for (int l = i; l < k; l++)
-            if (lstr[l] != L' ' && lstr[l] != L'\t' && lstr[l] != L'\r')
-                names.top().append(lstr[l]);
+            if (wbuf[l] != L' ' && wbuf[l] != L'\t' && wbuf[l] != L'\r')
+                names.top().append(wbuf[l]);
         i = j + 1;
-        while (i < wsz && (lstr[i] == L'\n' || lstr[i] == L' ' ||
-                           lstr[i] == L'\t' || lstr[i] == L'\r'))
+        while (i < wsz && (wbuf[i] == L'\n' || wbuf[i] == L' ' ||
+                           wbuf[i] == L'\t' || wbuf[i] == L'\r'))
             i++;
+    }
+    list<hash_string_info> *aidx = new (std::nothrow) list<hash_string_info>[HASH_SZ];
+    if (aidx == NULL)
+    {
+#ifdef HANDLE_MEMORY_EXCEPTION
+        HANDLE_MEMORY_EXCEPTION;
+#endif
+    }
+    for (int i = 0; i < names.size(); i++)
+    {
+        int hv = h(names[i]), j;
+        for (j = 0; j < aidx[hv].size(); j++)
+            if (aidx[hv][j].str == names[i])
+                break;
+        if (j == aidx[hv].size())
+            aidx[hv].append({i, names[i]});
     }
     relist = list<expr>();
     for (int i = 0; i <= sep.size(); i++)
     {
-        unsigned int RHS[] = {(unsigned int)i, OP_TRMNL};
-        relist.append(expr(names.size() + i, RHS));
+        list<unsigned int> RHS;
+        RHS.append((unsigned int)i);
+        relist.append({(unsigned int)(names.size() + i), RHS});
     }
+    unsigned int id_rsvd = 0;
+    for (i = 0; i < sz_rsvd; i++)
+        ebnflist.append({id_rsvd++, list<unsigned int>()});
     i = j = line = 0;
-    while (i < wsz && (lstr[i] == L'\n' || lstr[i] == L' ' ||
-                       lstr[i] == L'\t' || lstr[i] == L'\r'))
+    id_rsvd = 0;
+    while (i < wsz && (wbuf[i] == L'\n' || wbuf[i] == L' ' ||
+                       wbuf[i] == L'\t' || wbuf[i] == L'\r'))
         i++;
     while (i < wsz)
     {
         line++;
         j = i;
-        while (j < wsz && lstr[j] != L'\n')
+        while (j < wsz && wbuf[j] != L'\n')
             j++;
         // [i, j) is one EBNF expression
         int k = i;
-        while (k + 2 < j && !(lstr[k] == ':' && lstr[k + 1] == ':' && lstr[k + 2] == '='))
+        while (k + 2 < j && !(wbuf[k] == ':' && wbuf[k + 1] == ':' && wbuf[k + 2] == '='))
             k++;
         if (k + 2 == j)
             return line;
+        list<unsigned int> lhs_name;
+        for (int l = i; l < k; l++)
+            if (wbuf[l] != L' ' && wbuf[l] != L'\t' && wbuf[l] != L'\r')
+                lhs_name.append(wbuf[l]);
+        int hv = h(lhs_name), lhs;
+        for (lhs = 0; lhs < aidx[hv].size(); lhs++)
+            if (aidx[hv][lhs].str == lhs_name)
+                break;
+        lhs = aidx[hv][lhs].idx;
         k += 3;
-        list<unsigned int> rhs_list;
+        list<unsigned int> rhs;
         list<unsigned int> name;
         bool reverse;
         list<unsigned int> terminals; // terminal symbol range
         int l, m;                     // loop variables
         while (k < j)
         {
-            if (lstr[k] == L' ' || lstr[k] == L'\t' || lstr[k] == L'#' || lstr[k] == L'[' ||
-                lstr[k] == L'\'' || lstr[k] == L'"' || lstr[k] == L'(' || lstr[k] == L')' ||
-                lstr[k] == L'?' || lstr[k] == L'|' || lstr[k] == L'-' || lstr[k] == L'+' ||
-                lstr[k] == L'*')
+            if (wbuf[k] == L' ' || wbuf[k] == L'\t' || wbuf[k] == L'#' || wbuf[k] == L'[' ||
+                wbuf[k] == L'\'' || wbuf[k] == L'"' || wbuf[k] == L'(' || wbuf[k] == L')' ||
+                wbuf[k] == L'?' || wbuf[k] == L'|' || wbuf[k] == L'-' || wbuf[k] == L'+' ||
+                wbuf[k] == L'*')
             {
-                if ((!name.empty() || lstr[k] == L'(' || lstr[k] == L'[' ||
-                     lstr[k] == L'#' || lstr[k] == L'\'' || lstr[k] == L'"') &&
-                    (!rhs_list.empty() &&
-                     (rhs_list.top() < OP_LPRTH || rhs_list.top() == OP_RPRTH ||
-                      rhs_list.top() == OP_KLCLS || rhs_list.top() == OP_OPTNL ||
-                      rhs_list.top() == OP_PTCLS))) // is not a operator
-                    rhs_list.append(OP_CNCAT);
+                if ((!name.empty() || wbuf[k] == L'(' || wbuf[k] == L'[' ||
+                     wbuf[k] == L'#' || wbuf[k] == L'\'' || wbuf[k] == L'"') &&
+                    (!rhs.empty() &&
+                     (rhs.top() < OP_LPRTH || rhs.top() == OP_RPRTH ||
+                      rhs.top() == OP_KLCLS || rhs.top() == OP_OPTNL ||
+                      rhs.top() == OP_PTCLS))) // is not a operator
+                    rhs.append(OP_CNCAT);
                 if (!name.empty())
                 {
                     int l;
-                    // need hash improvement
-                    for (l = 0; l < names.size(); l++)
-                        if (names[l] == name)
+                    hv = h(name);
+                    for (l = 0; l < aidx[hv].size(); l++)
+                        if (aidx[hv][l].str == name)
                             break;
-                    if (l == names.size())
+                    if (l == aidx[hv].size())
                         return line;
-                    // need hash improvement
-                    rhs_list.append((unsigned int)l);
+                    rhs.append((unsigned int)aidx[hv][l].idx);
                     name = list<unsigned int>();
                 }
             }
-            switch (lstr[k])
+            switch (wbuf[k])
             {
             case L'\r': // carriage return
                 k++;
@@ -1024,40 +1107,44 @@ int ReadEBNFFromFile(FILE *fp, UINT code_page, list<expr> &ebnflist, list<expr> 
                 k++;
                 break;
             case L'#': // unicode characters
-                if (k + 1 < j && lstr[k + 1] == L'x')
+                if (k + 1 < j && wbuf[k + 1] == L'x')
                 {
                     unsigned short num;
-                    k = GetInt(lstr, k + 2, num);
-                    if (!rhs_list.empty() && rhs_list.top() < OP_LPRTH)
-                        rhs_list.append(OP_CNCAT);
-                    rhs_list.append(DetermineTerminal(sep, num) + names.size());
+                    k = GetInt(wbuf, wsz, k + 2, num);
+                    ebnflist[id_rsvd].rhs.append(DetermineTerminal(sep, num) + names.size());
+                    hv = h(names[id_rsvd]);
+                    for (l = 0; l < aidx[hv].size(); l++)
+                        if (aidx[hv][l].str == names[id_rsvd])
+                            break;
+                    rhs.append(aidx[hv][l].idx);
+                    id_rsvd++;
                 }
                 else
-                    name.append(lstr[k++]);
+                    name.append(wbuf[k++]);
                 break;
-            case L'[': // strings
+            case L'[': // optional charcters
                 k++;
-                if ((reverse = k < j && lstr[k] == L'^'))
+                if ((reverse = k < j && wbuf[k] == L'^'))
                     k++;
                 terminals = list<unsigned int>();
                 l = k;
-                while (l < j && lstr[l] != L']')
+                while (l < j && wbuf[l] != L']')
                     l++;
                 m = k; // m in [k, l)
                 while (m < l)
                 {
                     unsigned short left, right;
-                    left = lstr[m];
-                    if (m + 1 < l && lstr[m] == L'#' && lstr[m + 1] == L'x')
-                        m = GetInt(lstr, m + 2, left);
+                    left = wbuf[m];
+                    if (m + 1 < l && wbuf[m] == L'#' && wbuf[m + 1] == L'x')
+                        m = GetInt(wbuf, wsz, m + 2, left);
                     else
                         m++;
-                    if (lstr[m] == L'-')
+                    if (wbuf[m] == L'-')
                     {
                         m++;
-                        right = lstr[m];
-                        if (m + 1 < l && lstr[m] == L'#' && lstr[m + 1] == L'x')
-                            m = GetInt(lstr, m + 2, left);
+                        right = wbuf[m];
+                        if (m + 1 < l && wbuf[m] == L'#' && wbuf[m + 1] == L'x')
+                            m = GetInt(wbuf, wsz, m + 2, left);
                         else
                             m++;
                     }
@@ -1067,133 +1154,195 @@ int ReadEBNFFromFile(FILE *fp, UINT code_page, list<expr> &ebnflist, list<expr> 
                         terminals.append(n + names.size());
                 }
                 if (reverse)
-                {
-                    list<unsigned int> terminals_r;
-                    int n = 0;
-                    for (m = 0; m <= sep.size(); m++)
-                        if (n < terminals.size() && (unsigned int)(m + names.size()) == terminals[n])
-                            n++;
-                        else
-                            terminals_r.append((unsigned int)(m + names.size()));
-                    terminals = terminals_r;
-                }
-                if (!rhs_list.empty() && rhs_list.top() < OP_LPRTH)
-                    rhs_list.append(OP_CNCAT);
+                    ebnflist[id_rsvd].rhs.append(OP_CMPLM);
                 if (terminals.empty())
-                    rhs_list.append(EPSILON);
+                    ebnflist[id_rsvd].rhs.append(EPSILON);
                 else
                 {
-                    if (terminals.size() > 1)
-                        rhs_list.append(OP_LPRTH);
-                    rhs_list.append(terminals[0]);
+                    if (reverse)
+                        ebnflist[id_rsvd].rhs.append(OP_LPRTH);
+                    ebnflist[id_rsvd].rhs.append(terminals[0]);
                     for (m = 1; m < terminals.size(); m++)
                     {
-                        rhs_list.append(OP_ALTER);
-                        rhs_list.append(terminals[m]);
+                        ebnflist[id_rsvd].rhs.append(OP_ALTER);
+                        ebnflist[id_rsvd].rhs.append(terminals[m]);
                     }
-                    if (terminals.size() > 1)
-                        rhs_list.append(OP_RPRTH);
+                    if (reverse)
+                        ebnflist[id_rsvd].rhs.append(OP_RPRTH);
                 }
+                hv = h(names[id_rsvd]);
+                for (m = 0; m < aidx[hv].size(); m++)
+                    if (aidx[hv][m].str == names[id_rsvd])
+                        break;
+                rhs.append(aidx[hv][m].idx);
+                id_rsvd++;
                 k = l + 1;
                 break;
             case L'\'':
             case L'"': // quoted strings
                 k++;
                 l = k;
-                while (l < j && lstr[l] != lstr[k - 1])
+                while (l < j && wbuf[l] != wbuf[k - 1])
                     l++;
                 if (l < j)
                 {
-                    if (!rhs_list.empty() && rhs_list.top() < OP_LPRTH)
-                        rhs_list.append(OP_CNCAT);
                     if (l == k)
-                        rhs_list.append(EPSILON);
+                        ebnflist[id_rsvd].rhs.append(EPSILON);
                     else
                     {
                         if (l > k + 1)
-                            rhs_list.append(OP_LPRTH);
-                        rhs_list.append(DetermineTerminal(sep, lstr[k]) + names.size());
+                            ebnflist[id_rsvd].rhs.append(OP_LPRTH);
+                        ebnflist[id_rsvd].rhs.append(
+                            DetermineTerminal(sep, wbuf[k]) + names.size());
                         for (m = k + 1; m < l; m++)
                         {
-                            rhs_list.append(OP_CNCAT);
-                            rhs_list.append(DetermineTerminal(sep, lstr[m]) + names.size());
+                            ebnflist[id_rsvd].rhs.append(OP_CNCAT);
+                            ebnflist[id_rsvd].rhs.append(
+                                DetermineTerminal(sep, wbuf[m]) + names.size());
                         }
                         if (l > k + 1)
-                            rhs_list.append(OP_RPRTH);
+                            ebnflist[id_rsvd].rhs.append(OP_RPRTH);
                     }
+                    hv = h(names[id_rsvd]);
+                    for (m = 0; m < aidx[hv].size(); m++)
+                        if (aidx[hv][m].str == names[id_rsvd])
+                            break;
+                    rhs.append(aidx[hv][m].idx);
+                    id_rsvd++;
                     k = l + 1;
                 }
                 else
-                    name.append(lstr[k - 1]);
+                    name.append(wbuf[k - 1]);
                 break;
             case L'(': // left parentheses
-                rhs_list.append(OP_LPRTH);
+                rhs.append(OP_LPRTH);
                 k++;
                 break;
             case L')': // right parentheses
-                rhs_list.append(OP_RPRTH);
+                rhs.append(OP_RPRTH);
                 k++;
                 break;
             case L'?': // optional operator
-                rhs_list.append(OP_OPTNL);
+                rhs.append(OP_OPTNL);
                 k++;
                 break;
             case L'|': // alternation operator
-                rhs_list.append(OP_ALTER);
+                rhs.append(OP_ALTER);
                 k++;
                 break;
             case L'-': // difference operator
-                rhs_list.append(OP_MINUS);
+                rhs.append(OP_MINUS);
                 k++;
                 break;
             case L'+': // positive closure operator
-                rhs_list.append(OP_PTCLS);
+                rhs.append(OP_PTCLS);
                 k++;
                 break;
             case L'*': // Kleene closure operator
-                rhs_list.append(OP_KLCLS);
+                rhs.append(OP_KLCLS);
                 k++;
                 break;
             default:
-                name.append(lstr[k++]);
+                name.append(wbuf[k++]);
                 break;
             }
         }
         if (!name.empty() &&
-            (!rhs_list.empty() &&
-             (rhs_list.top() < OP_LPRTH || rhs_list.top() == OP_RPRTH ||
-              rhs_list.top() == OP_KLCLS || rhs_list.top() == OP_OPTNL ||
-              rhs_list.top() == OP_PTCLS))) // is not a operator
-            rhs_list.append(OP_CNCAT);
+            (!rhs.empty() &&
+             (rhs.top() < OP_LPRTH || rhs.top() == OP_RPRTH ||
+              rhs.top() == OP_KLCLS || rhs.top() == OP_OPTNL ||
+              rhs.top() == OP_PTCLS))) // is not a operator
+            rhs.append(OP_CNCAT);
         if (!name.empty())
         {
             int l;
-            // need hash improvement
-            for (l = 0; l < names.size(); l++)
-                if (names[l] == name)
+            int hv = h(name);
+            for (l = 0; l < aidx[hv].size(); l++)
+                if (aidx[hv][l].str == name)
                     break;
-            if (l == names.size())
+            if (l == aidx[hv].size())
                 return line;
-            // need hash improvement
-            rhs_list.append((unsigned int)l);
+            rhs.append((unsigned int)aidx[hv][l].idx);
             name = list<unsigned int>();
         }
-        unsigned int *rhs = (unsigned int *)malloc(sizeof(unsigned int) * (rhs_list.size() + 1));
-        if (rhs == NULL)
-        {
-#ifdef HANDLE_MEMORY_EXCEPTION
-            HANDLE_MEMORY_EXCEPTION;
-#endif
-        }
-        for (int i = 0; i < rhs_list.size(); i++)
-            rhs[i] = rhs_list[i];
-        rhs[rhs_list.size()] = OP_TRMNL;
-        ebnflist.append(expr(id++, rhs));
-        free(rhs);
+        ebnflist.append({(unsigned int)lhs, rhs});
         i = j + 1;
-        while (i < wsz && (lstr[i] == L'\n' || lstr[i] == L' ' ||
-                           lstr[i] == L'\t' || lstr[i] == L'\r'))
+        while (i < wsz && (wbuf[i] == L'\n' || wbuf[i] == L' ' ||
+                           wbuf[i] == L'\t' || wbuf[i] == L'\r'))
             i++;
     }
+    free(wbuf);
+    delete[] aidx;
     return 0;
+}
+
+/**
+ * @brief LL(1) parsing
+ * 
+ * @param t parsing table
+ * @param tr the result parsing tree
+ * @param str the input string
+ */
+bool LL1Parsing(ll1_parsing_table t_ll1, dfa_table t_fa, parsing_tree &tr, const wchar_t *str)
+{
+    list<unsigned int> tk;
+    const wchar_t *p = str;
+    while (*p != L'\0')
+    {
+        const wchar_t *q = p;
+        int state = t_fa.get_start();
+        int acceptable_state = UNDEFINED;
+        while (*q != L'\0')
+        {
+            int next_state = t_fa.next(state, *q++);
+            if (next_state == UNDEFINED)
+                break;
+            else if (t_fa.is_acceptable(state = next_state))
+            {
+                acceptable_state = state;
+                p = q;
+            }
+        }
+        if (acceptable_state == UNDEFINED)
+            return false;
+        tk.append(t_fa.get_token(acceptable_state));
+    }
+    tk.append(LL1_PARSING_TERMINAL);
+    list<hash_symbol_info> st_hs; // hash infomation stack
+    list<parsing_tree *> st_tr;   // tree node
+    st_hs.push_back(*t_ll1.query_symbol(LL1_PARSING_TERMINAL));
+    st_hs.push_back(*t_ll1.query_symbol(t_ll1.get_start()));
+    st_tr.push_back(&tr);
+    int i = 0;
+    tr = parsing_tree();
+    tr.symbol = t_ll1.get_start();
+    while (i < tk.size())
+    {
+        if (st_hs.empty())
+            return false;
+        hash_symbol_info hs = st_hs.top();
+        parsing_tree *cur_node = st_tr.top();
+        st_hs.pop_back();
+        st_tr.pop_back();
+        const hash_symbol_info *p_info = t_ll1.query_symbol(tk[i]);
+        if (hs.regular)
+            if (hs.symbol == p_info->symbol)
+                i++;
+            else
+                return false;
+        else
+            for (int i = t_ll1[hs.idx][p_info->idx].size() - 1; i >= 0; i--)
+                if (t_ll1[hs.idx][p_info->idx][i] == LL1_PARSING_ERROR)
+                    return false;
+                else
+                {
+                    st_hs.push_back(*t_ll1.query_symbol(t_ll1[hs.idx][p_info->idx][i]));
+                    cur_node->subtree.push_front(parsing_tree());
+                    cur_node->subtree.bottom().symbol = st_hs.top().symbol;
+                    st_tr.push_back(&cur_node->subtree.bottom());
+                }
+    }
+    if (!st_hs.empty())
+        return false;
+    return true;
 }

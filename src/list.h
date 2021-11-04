@@ -1,6 +1,6 @@
 /****************************************************************
  * @file list.h
- * @author Jiang, Xingyu (chinajxy@outlook.com)
+ * @author Name (username@domain.com)
  * @brief Template of a list class, constructed by link list
  * @version 0.1
  * @date 2021-09-30

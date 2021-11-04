@@ -1,6 +1,6 @@
 /****************************************************************
  * @file grammar.h
- * @author Jiang, Xingyu (chinajxy@outlook.com)
+ * @author Name (username@domain.com)
  * @brief Data structures and functions to process grammar
  * @version 0.1
  * @date 2021-10-24
@@ -13,12 +13,11 @@
 
 #include "list.h"
 #include "FA.h"
-#include <cstdio>
-#include <windows.h>
+using namespace std;
 
 #define HASH_SZ 1024
-#define TERMINAL_BOUND ((unsigned int)0x80000000)
 #define LL1_PARSING_ERROR ((unsigned int)0xffffffff)
+#define LL1_PARSING_TERMINAL ((unsigned int)0xffffffff)
 
 struct prod
 {
@@ -28,7 +27,7 @@ struct prod
 
 struct parsing_tree
 {
-    prod production;
+    unsigned int symbol;
     list<parsing_tree> subtree;
 };
 
@@ -46,12 +45,19 @@ struct hash_symbol_info
     unsigned int symbol;
 };
 
+struct hash_string_info
+{
+    int idx;
+    list<unsigned int> str;
+};
+
 class ll1_parsing_table
 {
 private:
     list<unsigned int> *table;
     list<hash_symbol_info> *aidx;
-    int row, col, s;
+    int row, col;
+    unsigned int s;
     void copy(const ll1_parsing_table &b);
     void calc_first(grammar &g, list<unsigned int> *first, unsigned int variable);
 
@@ -63,14 +69,15 @@ public:
     const hash_symbol_info *query_symbol(unsigned int symbol);
     int get_row();
     int get_col();
-    int get_start();
+    unsigned int get_start();
     list<unsigned int> *operator[](int idx);
 };
 
-int ReadEBNFFromFile(FILE *fp, UINT code_page, list<expr> &ebnflist, list<expr> &relist,
-                     list<unsigned int> &sep, list<list<unsigned int>> &names);
 bool EBNFToGrammar(list<expr> ebnflist, list<expr> &relist, unsigned int s, grammar &g,
                    bool detect_regular = true);
+int ReadEBNFFromString(wchar_t *wbuf, list<expr> &ebnflist, unsigned int &start, list<expr> &relist,
+                       list<unsigned int> &sep, list<list<unsigned int>> &names);
+bool LL1Parsing(ll1_parsing_table t_ll1, dfa_table t_fa, parsing_tree &tr, const wchar_t *str);
 
 // Extended Backus-Naur Form (EBNF) notation, from XML specification
 // Reference link: https://www.w3.org/TR/xml/

@@ -43,6 +43,14 @@
         "xmemory": "cpp",
         "xstddef": "cpp",
         "xstring": "cpp",
-        "vector": "cpp"
+        "vector": "cpp",
+        "xlocbuf": "cpp",
+        "codecvt": "cpp",
+        "iomanip": "cpp",
+        "locale": "cpp",
+        "string": "cpp",
+        "xlocmes": "cpp",
+        "xlocmon": "cpp",
+        "xloctime": "cpp"
     }
 }

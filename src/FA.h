@@ -1,6 +1,6 @@
 /****************************************************************
  * @file FA.h
- * @author Jiang, Xingyu (chinajxy@outlook.com)
+ * @author Name (username@domain.com)
  * @brief Data structures and functions to process finite automata
  * @version 0.1
  * @date 2021-10-15
@@ -19,16 +19,15 @@
 #define UNDEFINED ((int)0x7fffffff)             // undefined transition in DFA table
 #define NON_TERMINAL ((unsigned int)0xffffffff) // non-terminal state token
 #define EPSILON ((unsigned int)0xffffffff)      // value representing epsilon
-#define OP_TRMNL ((unsigned int)0xfffffffe)     // RE string terminal
-#define OP_KLCLS ((unsigned int)0xfffffffd)     // '*'
-#define OP_PTCLS ((unsigned int)0xfffffffc)     // '+'
-#define OP_OPTNL ((unsigned int)0xfffffffb)     // '?'
-#define OP_CMPLM ((unsigned int)0xfffffffa)     // '~'
-#define OP_CNCAT ((unsigned int)0xfffffff9)     // '.'
-#define OP_ALTER ((unsigned int)0xfffffff8)     // '|'
-#define OP_MINUS ((unsigned int)0xfffffff7)     // '-'
-#define OP_RPRTH ((unsigned int)0xfffffff6)     // ')'
-#define OP_LPRTH ((unsigned int)0xfffffff5)     // '('
+#define OP_KLCLS ((unsigned int)0xfffffffe)     // '*'
+#define OP_PTCLS ((unsigned int)0xfffffffd)     // '+'
+#define OP_OPTNL ((unsigned int)0xfffffffc)     // '?'
+#define OP_CMPLM ((unsigned int)0xfffffffb)     // '~'
+#define OP_CNCAT ((unsigned int)0xfffffffa)     // '.'
+#define OP_ALTER ((unsigned int)0xfffffff9)     // '|'
+#define OP_MINUS ((unsigned int)0xfffffff8)     // '-'
+#define OP_RPRTH ((unsigned int)0xfffffff7)     // ')'
+#define OP_LPRTH ((unsigned int)0xfffffff6)     // '('
 
 struct edge_info
 {
@@ -50,12 +49,7 @@ public:
     // an extra terminal are needed
     // which is EXPR -> EXPR# (# -> OP_TRMNL)
     unsigned int lhs;
-    unsigned int *rhs;
-    expr(const expr &b);
-    expr(unsigned int LHS);
-    expr(unsigned int LHS, const unsigned int *RHS);
-    ~expr();
-    expr &operator=(const expr &b);
+    list<unsigned int> rhs;
     bool operator<(const expr &b) const;
     expr operator|(const expr &b) const;
     expr operator<<(const expr &b) const;
@@ -87,7 +81,8 @@ class dfa_table
 private:
     // [0, 0x110000) -> [0, sep[0]), [sep[0], sep[1]), ..., [sep[col - 2], sep[col - 1])
     // sep[col - 1] = 0x110000
-    unsigned int *table, *sep;
+    unsigned int *sep, *token;
+    int *table;
     int row, col, s;
     bool *f;
     void copy(const dfa_table &b);
@@ -97,10 +92,11 @@ public:
     dfa_table(fa dfa, list<unsigned int> lsep);
     ~dfa_table();
     dfa_table &operator=(const dfa_table &b);
-    unsigned int *operator[](int idx);
+    int *operator[](int idx);
     int get_row();
     int get_col();
     int get_start();
+    unsigned int get_token(int idx);
     bool is_acceptable(int idx);
     int next(int state, unsigned int ch);
 };
