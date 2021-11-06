@@ -879,7 +879,7 @@ int DetermineTerminal(list<unsigned int> &sep, unsigned int ch)
  * @param l the string
  * @return hash value
  */
-int h(list<unsigned int> &l)
+int h(list<wchar_t> &l)
 {
     int ans = 0;
     for (int i = 0; i < l.size(); i++)
@@ -900,14 +900,14 @@ int h(list<unsigned int> &l)
  * @return the line number
  */
 int ReadEBNFFromString(wchar_t *wbuf, list<expr> &ebnflist, unsigned int &start, list<expr> &relist,
-                       list<unsigned int> &sep, list<list<unsigned int>> &names)
+                       list<unsigned int> &sep, list<list<wchar_t>> &names)
 {
     int wsz = 0;
     while (wbuf[wsz] != L'\0')
         wsz++;
     // some extra space is reserved for inline-RE ordering (0 - sz_rsvd)
     int i = 0, line = 1, sz_rsvd = 0;
-    names = list<list<unsigned int>>();
+    names = list<list<wchar_t>>();
     while (i < wsz)
         if (wbuf[i] == L'[')
         {
@@ -919,7 +919,7 @@ int ReadEBNFFromString(wchar_t *wbuf, list<expr> &ebnflist, unsigned int &start,
                 j++;
             if (j == wsz || wbuf[j] == L'\n')
                 return line;
-            names.append(list<unsigned int>());
+            names.append(list<wchar_t>());
             for (int k = i - 1; k <= j; k++)
                 names[sz_rsvd].append(wbuf[k]);
             sz_rsvd++;
@@ -955,7 +955,7 @@ int ReadEBNFFromString(wchar_t *wbuf, list<expr> &ebnflist, unsigned int &start,
                 int j = GetInt(wbuf, wsz, i + 2, num);
                 sep.append(num);
                 sep.append(num + 1);
-                names.append(list<unsigned int>());
+                names.append(list<wchar_t>());
                 for (int k = i; k < j; k++)
                     names[sz_rsvd].append(wbuf[k]);
                 sz_rsvd++;
@@ -977,7 +977,7 @@ int ReadEBNFFromString(wchar_t *wbuf, list<expr> &ebnflist, unsigned int &start,
                 }
             else
                 return line;
-            names.append(list<unsigned int>());
+            names.append(list<wchar_t>());
             for (int k = i - 1; k <= j; k++)
                 names[sz_rsvd].append(wbuf[k]);
             sz_rsvd++;
@@ -1003,7 +1003,7 @@ int ReadEBNFFromString(wchar_t *wbuf, list<expr> &ebnflist, unsigned int &start,
             k++;
         if (k + 2 == wsz)
             return line;
-        names.append(list<unsigned int>());
+        names.append(list<wchar_t>());
         for (int l = i; l < k; l++)
             if (wbuf[l] != L' ' && wbuf[l] != L'\t' && wbuf[l] != L'\r')
                 names.top().append(wbuf[l]);
@@ -1055,7 +1055,7 @@ int ReadEBNFFromString(wchar_t *wbuf, list<expr> &ebnflist, unsigned int &start,
             k++;
         if (k + 2 == j)
             return line;
-        list<unsigned int> lhs_name;
+        list<wchar_t> lhs_name;
         for (int l = i; l < k; l++)
             if (wbuf[l] != L' ' && wbuf[l] != L'\t' && wbuf[l] != L'\r')
                 lhs_name.append(wbuf[l]);
@@ -1066,7 +1066,7 @@ int ReadEBNFFromString(wchar_t *wbuf, list<expr> &ebnflist, unsigned int &start,
         lhs = aidx[hv][lhs].idx;
         k += 3;
         list<unsigned int> rhs;
-        list<unsigned int> name;
+        list<wchar_t> name;
         bool reverse;
         list<unsigned int> terminals; // terminal symbol range
         int l, m;                     // loop variables
@@ -1094,7 +1094,7 @@ int ReadEBNFFromString(wchar_t *wbuf, list<expr> &ebnflist, unsigned int &start,
                     if (l == aidx[hv].size())
                         return line;
                     rhs.append((unsigned int)aidx[hv][l].idx);
-                    name = list<unsigned int>();
+                    name = list<wchar_t>();
                 }
             }
             switch (wbuf[k])
@@ -1263,7 +1263,7 @@ int ReadEBNFFromString(wchar_t *wbuf, list<expr> &ebnflist, unsigned int &start,
             if (l == aidx[hv].size())
                 return line;
             rhs.append((unsigned int)aidx[hv][l].idx);
-            name = list<unsigned int>();
+            name = list<wchar_t>();
         }
         ebnflist.append({(unsigned int)lhs, rhs});
         i = j + 1;
@@ -1271,7 +1271,6 @@ int ReadEBNFFromString(wchar_t *wbuf, list<expr> &ebnflist, unsigned int &start,
                            wbuf[i] == L'\t' || wbuf[i] == L'\r'))
             i++;
     }
-    free(wbuf);
     delete[] aidx;
     return 0;
 }
@@ -1285,29 +1284,9 @@ int ReadEBNFFromString(wchar_t *wbuf, list<expr> &ebnflist, unsigned int &start,
  */
 bool LL1Parsing(ll1_parsing_table t_ll1, dfa_table t_fa, parsing_tree &tr, const wchar_t *str)
 {
-    list<unsigned int> tk;
-    const wchar_t *p = str;
-    while (*p != L'\0')
-    {
-        const wchar_t *q = p;
-        int state = t_fa.get_start();
-        int acceptable_state = UNDEFINED;
-        while (*q != L'\0')
-        {
-            int next_state = t_fa.next(state, *q++);
-            if (next_state == UNDEFINED)
-                break;
-            else if (t_fa.is_acceptable(state = next_state))
-            {
-                acceptable_state = state;
-                p = q;
-            }
-        }
-        if (acceptable_state == UNDEFINED)
-            return false;
-        tk.append(t_fa.get_token(acceptable_state));
-    }
-    tk.append(LL1_PARSING_TERMINAL);
+    list<token_info> tk;
+    t_fa.token_stream(str, tk);
+    tk.append(token_info(LL1_PARSING_TERMINAL));
     list<hash_symbol_info> st_hs; // hash infomation stack
     list<parsing_tree *> st_tr;   // tree node
     st_hs.push_back(*t_ll1.query_symbol(LL1_PARSING_TERMINAL));
@@ -1324,10 +1303,17 @@ bool LL1Parsing(ll1_parsing_table t_ll1, dfa_table t_fa, parsing_tree &tr, const
         parsing_tree *cur_node = st_tr.top();
         st_hs.pop_back();
         st_tr.pop_back();
-        const hash_symbol_info *p_info = t_ll1.query_symbol(tk[i]);
+        const hash_symbol_info *p_info = t_ll1.query_symbol(tk[i].token);
         if (hs.regular)
             if (hs.symbol == p_info->symbol)
+            {
+                if (cur_node != NULL)
+                {
+                    cur_node->symbol = tk[i].token;
+                    cur_node->token = tk[i];
+                }
                 i++;
+            }
             else
                 return false;
         else

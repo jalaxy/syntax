@@ -1,4 +1,21 @@
-int main()
+
+
+int Hello (  int a, int b ) {   return a + b;}
+long World()  {
+    return 0l;
+}
+
+int main  (
+
+)
 {
-    return 0;
+    extern	int a;
+    int ba;
+    int cbba1e;
+    while ( a   )
+        if (ba >= cbba1e)
+        ba = a + cbba1e * (a*( Hello(
+            cbba1e, ba * a) * World())+ ba) ;
+    ba  ;
+    return a+ (ba = a == cbba1e);
 }

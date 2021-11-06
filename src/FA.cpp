@@ -354,6 +354,132 @@ int dfa_table::next(int state, unsigned int ch)
 }
 
 /**
+ * @brief Convert a string into token stream and lexemes
+ * 
+ * @param str a string
+ * @param tokens the output tokens
+ * @return whether it is successful
+ */
+bool dfa_table::token_stream(const wchar_t *str, list<token_info> &tokens)
+{
+    tokens = list<token_info>();
+    const wchar_t *p = str;
+    while (*p != L'\0')
+    {
+        const wchar_t *q = p, *base = p;
+        int state = s;
+        int acceptable_state = UNDEFINED;
+        while (*q != L'\0')
+        {
+            int next_state = next(state, *q++);
+            if (next_state == UNDEFINED)
+                break;
+            else if (f[state = next_state])
+            {
+                acceptable_state = state;
+                p = q;
+            }
+        }
+        if (acceptable_state == UNDEFINED)
+            return false;
+        tokens.append(token_info(token[acceptable_state], base, p - base));
+    }
+    return true;
+}
+
+/**
+ * @brief Construct a new token info object from another object
+ * 
+ * @param b another object 
+ */
+token_info::token_info(const token_info &b)
+{
+    token = b.token;
+    int sz = 0;
+    if ((lexeme = b.lexeme) == NULL)
+        return;
+    while (b.lexeme[sz++] != L'\0')
+        ;
+    lexeme = (wchar_t *)malloc(sizeof(wchar_t) * sz);
+    if (lexeme == NULL)
+    {
+#ifdef HANDLE_MEMORY_EXCEPTION
+        HANDLE_MEMORY_EXCEPTION;
+#endif
+    }
+    memcpy(lexeme, b.lexeme, sz * sizeof(wchar_t));
+}
+
+/**
+ * @brief Construct a new token info object from assignment
+ * 
+ * @param TOKEN the token to copy
+ * @param LEXEME the lexeme string to copy
+ * @param len the length of lexeme
+ */
+token_info::token_info(unsigned int TOKEN, const wchar_t *LEXEME, int len)
+{
+    token = TOKEN;
+    if (LEXEME == NULL)
+    {
+        lexeme = NULL;
+        return;
+    }
+    if (len < 0)
+    {
+        len = 0;
+        while (LEXEME[len] != L'\0')
+            len++;
+    }
+    lexeme = (wchar_t *)malloc(sizeof(wchar_t) * (len + 1));
+    if (lexeme == NULL)
+    {
+#ifdef HANDLE_MEMORY_EXCEPTION
+        HANDLE_MEMORY_EXCEPTION;
+#endif
+    }
+    memcpy(lexeme, LEXEME, len * sizeof(wchar_t));
+    lexeme[len] = L'\0';
+}
+
+/**
+ * @brief Assignment function
+ * 
+ * @param b another object
+ * @return reference to this object
+ */
+token_info &token_info::operator=(const token_info &b)
+{
+    if (lexeme != NULL)
+        free(lexeme);
+    token = b.token;
+    int sz = 0;
+    if ((lexeme = b.lexeme) == NULL)
+        return *this;
+    while (b.lexeme[sz++] != L'\0')
+        ;
+    lexeme = (wchar_t *)malloc(sizeof(wchar_t) * sz);
+    if (lexeme == NULL)
+    {
+#ifdef HANDLE_MEMORY_EXCEPTION
+        HANDLE_MEMORY_EXCEPTION;
+#endif
+    }
+    memcpy(lexeme, b.lexeme, sz * sizeof(wchar_t));
+    return *this;
+}
+
+/**
+ * @brief Destroy the token info object
+ * 
+ */
+token_info::~token_info()
+{
+    if (lexeme != NULL)
+        free(lexeme);
+}
+
+/**
  * @brief Comparison between two vertices
  * 
  * @param a one vertex
@@ -555,6 +681,8 @@ bool REToNFA(list<expr> relist, fa &nfa, unsigned int symbol_range)
                         break;
                     }
                     op_stack.pop_back();
+                    NFAToDFA(fa_stack.top(), fa_stack.top());
+                    MinimizeDFA(fa_stack.top());
                 }
                 if (ch == OP_RPRTH)
                     op_stack.pop_back();

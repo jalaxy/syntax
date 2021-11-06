@@ -43,11 +43,15 @@ struct vertex_info
 typedef vertex<vertex_info, edge_info> vertex_t;
 typedef edge<vertex_info, edge_info> edge_t;
 
+struct hash_subset_info
+{
+    int idx;
+    list<vertex_t *> subset;
+};
+
 class expr
 {
 public:
-    // an extra terminal are needed
-    // which is EXPR -> EXPR# (# -> OP_TRMNL)
     unsigned int lhs;
     list<unsigned int> rhs;
     bool operator<(const expr &b) const;
@@ -55,6 +59,17 @@ public:
     expr operator<<(const expr &b) const;
     expr operator*() const;
     expr operator~() const;
+};
+
+class token_info
+{
+public:
+    unsigned int token;
+    wchar_t *lexeme;
+    token_info(const token_info &b);
+    token_info(unsigned int TOKEN = NON_TERMINAL, const wchar_t *LEXEME = NULL, int len = -1);
+    token_info &operator=(const token_info &b);
+    ~token_info();
 };
 
 class fa
@@ -99,15 +114,8 @@ public:
     unsigned int get_token(int idx);
     bool is_acceptable(int idx);
     int next(int state, unsigned int ch);
+    bool token_stream(const wchar_t *str, list<token_info> &tokens);
 };
-
-struct hash_subset_info
-{
-    int idx;
-    list<vertex_t *> subset;
-};
-
-extern unsigned int id;
 
 bool operator<(const vertex_info &a, const vertex_info &b);
 bool operator<(const edge_info &a, const edge_info &b);

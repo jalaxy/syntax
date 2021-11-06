@@ -28,6 +28,7 @@ struct prod
 struct parsing_tree
 {
     unsigned int symbol;
+    token_info token;
     list<parsing_tree> subtree;
 };
 
@@ -48,7 +49,7 @@ struct hash_symbol_info
 struct hash_string_info
 {
     int idx;
-    list<unsigned int> str;
+    list<wchar_t> str;
 };
 
 class ll1_parsing_table
@@ -76,7 +77,7 @@ public:
 bool EBNFToGrammar(list<expr> ebnflist, list<expr> &relist, unsigned int s, grammar &g,
                    bool detect_regular = true);
 int ReadEBNFFromString(wchar_t *wbuf, list<expr> &ebnflist, unsigned int &start, list<expr> &relist,
-                       list<unsigned int> &sep, list<list<unsigned int>> &names);
+                       list<unsigned int> &sep, list<list<wchar_t>> &names);
 bool LL1Parsing(ll1_parsing_table t_ll1, dfa_table t_fa, parsing_tree &tr, const wchar_t *str);
 
 // Extended Backus-Naur Form (EBNF) notation, from XML specification

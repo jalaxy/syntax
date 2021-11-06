@@ -19,11 +19,16 @@
  * 态转移表等等, 如果说可以的话也可以试着可视化一下. 当然实在不行应该直接
  * 输入串输出能否识别应该也是符合要求的.
  */
+
 #include "test.h"
 #ifdef _WIN32
 #include <windows.h>
+#include <cstring>
 #endif
 using namespace std;
+
+list<list<wchar_t>> names; // 表达式名称
+
 int main()
 {
     FILE *fp = fopen("EBNF.txt", "rb");
@@ -31,10 +36,10 @@ int main()
     setlocale(LC_ALL, "C.UTF-8");
 #endif
 
-    list<expr> ebnflist, relist;    // 扩展BNF和正则表达式的列表
-    unsigned int start;             // 起始符号
-    list<unsigned int> sep;         // 字符分隔数组
-    list<list<unsigned int>> names; // 表达式名称
+    cout << "Analysing...\n";
+    list<expr> ebnflist, relist; // 扩展BNF和正则表达式的列表
+    unsigned int start;          // 起始符号
+    list<unsigned int> sep;      // 字符分隔数组
     // 这个函数是从文件中读取扩充巴克斯瑙尔范式(EBNF), 以构造文法
     fseek(fp, 0, SEEK_END);
     size_t len = ftell(fp);
@@ -62,6 +67,14 @@ int main()
     // 中可以化为正则表达式的产生式化简为正则表达式
     EBNFToGrammar(ebnflist, relist, start, g, true);
 
+    // 这个构造函数是将文法转换为LL(1)预测分析表
+    ll1_parsing_table ll1_tb(g);
+    if (ll1_tb.get_row() * ll1_tb.get_col() == 0)
+    {
+        cout << "This is not a LL(1) grammar.\n";
+        return -1;
+    }
+
     fa dfa, nfa;
     // 这些函数是将正则表达式化简为最小化DFA的, 并转换为状态转移表.
     REToNFA(relist, nfa, sep.size() + 1);
@@ -69,47 +82,49 @@ int main()
     MinimizeDFA(dfa);
     dfa_table dfa_tb(dfa, sep);
 
-    // 这个构造函数是将文法转换为LL(1)预测分析表
-    ll1_parsing_table ll1_tb(g);
-
     free(wbuf);
     free(buf);
-    fp = fopen("string.txt", "rb");
-    fseek(fp, 0, SEEK_END);
-    len = ftell(fp);
-    rewind(fp);
-    buf = (char *)malloc(sizeof(char) * (len + 1));
-    fread(buf, 1, len, fp);
-    buf[len] = 0;
+
+    cout << "Ready for parsing. Enter 'q' to quit, and anything else to parse.\n";
+    while (getchar() != 'q')
+    {
+        fp = fopen("string.txt", "rb");
+        fseek(fp, 0, SEEK_END);
+        len = ftell(fp);
+        rewind(fp);
+        buf = (char *)malloc(sizeof(char) * (len + 1));
+        fread(buf, 1, len, fp);
+        buf[len] = 0;
 #ifdef _WIN32
-    wlen = MultiByteToWideChar(CP_UTF8, 0, buf, len, NULL, 0);
+        wlen = MultiByteToWideChar(CP_UTF8, 0, buf, len, NULL, 0);
 #else
-    wlen = mbstowcs(NULL, buf, len);
+        wlen = mbstowcs(NULL, buf, len);
 #endif
-    wbuf = (wchar_t *)malloc(sizeof(wchar_t) * (len + 1));
+        wbuf = (wchar_t *)malloc(sizeof(wchar_t) * (len + 1));
 #ifdef _WIN32
-    MultiByteToWideChar(CP_UTF8, 0, buf, len, wbuf, wlen);
+        MultiByteToWideChar(CP_UTF8, 0, buf, len, wbuf, wlen);
 #else
-    mbstowcs(wbuf, buf, len);
+        mbstowcs(wbuf, buf, len);
 #endif
-    wbuf[wlen] = L'\0';
-    fclose(fp);
+        wbuf[wlen] = L'\0';
+        fclose(fp);
 
-    parsing_tree tr;
-    // 这个函数是LL(1)的分析过程, 输出结果为一个语法树tr
-    bool suc = LL1Parsing(ll1_tb, dfa_tb, tr, wbuf);
+        parsing_tree tr;
+        // 这个函数是LL(1)的分析过程, 输出结果为一个语法树tr
+        bool suc = LL1Parsing(ll1_tb, dfa_tb, tr, wbuf);
 
-    // 输出语法分析树, 左边是根节点, 右边是它的子结点
-    print(tr, names);
+        // 输出语法分析树, 左边是根节点, 右边是它的子结点
+        print(tr, names);
+        cout << endl
+             << (suc ? "success\n" : "failure\n");
 
-    free(buf);
-    free(wbuf);
+        free(buf);
+        free(wbuf);
+    }
     return 0;
 }
-void print(parsing_tree &tr, list<list<unsigned int>> &names)
+void print(parsing_tree &tr, list<list<wchar_t>> &names)
 {
-    if (tr.subtree.size() == 0)
-        return;
     if (tr.symbol < (unsigned int)names.size())
     {
         for (int j = 0; j < names[tr.symbol].size(); j++)
@@ -127,6 +142,30 @@ void print(parsing_tree &tr, list<list<unsigned int>> &names)
     }
     else
         cout << tr.symbol << ": ";
+    if (tr.subtree.size() == 0)
+    {
+        if (tr.token.lexeme == NULL)
+            cout << "#";
+        else
+        {
+#ifdef _WIN32
+            int len = WideCharToMultiByte(
+                CP_ACP, 0, tr.token.lexeme, wcslen(tr.token.lexeme), NULL, 0, 0, NULL);
+#else
+            int len = wcstombs(NULL, tr.token.lexeme, 0);
+#endif
+            char *str = (char *)malloc(sizeof(wchar_t) * (len + 1));
+#ifdef _WIN32
+            WideCharToMultiByte(
+                CP_ACP, 0, tr.token.lexeme, wcslen(tr.token.lexeme), str, len, 0, NULL);
+#else
+            wcstombs(str, tr.token.lexeme, len);
+#endif
+            str[len] = '\0';
+            cout << str;
+            free(str);
+        }
+    }
     for (int i = 0; i < tr.subtree.size(); i++)
         if (tr.subtree[i].symbol < (unsigned int)names.size())
         {
@@ -169,11 +208,29 @@ void print(list<unsigned int> l, bool ch)
 #else
             wcstombs(str, wstr, 8);
 #endif
-            cout << str << " ";
+            cout << str;
         }
         else
             cout << l[i] << " ";
-    cout << endl;
+    if (!ch)
+        cout << endl;
+}
+void print(list<wchar_t> l)
+{
+    for (int i = 0; i < l.size(); i++)
+        if (l[i] == EPSILON)
+            cout << "# ";
+        else
+        {
+            wchar_t wstr[2] = {(unsigned short)l[i], 0};
+            char str[8] = "\0\0\0\0\0\0\0";
+#ifdef _WIN32
+            WideCharToMultiByte(CP_ACP, 0, wstr, 2, str, 8, 0, NULL);
+#else
+            wcstombs(str, wstr, 8);
+#endif
+            cout << str;
+        }
 }
 void print(list<unsigned int> *l, int n)
 {
@@ -333,7 +390,7 @@ void print(ll1_parsing_table table)
         cout << endl;
     }
 }
-void print(list<list<unsigned int>> names)
+void print(list<list<wchar_t>> names)
 {
     for (int i = 0; i < names.size(); i++)
     {
@@ -356,4 +413,32 @@ void print(list<hash_symbol_info> l)
     for (int i = 0; i < l.size(); i++)
         cout << l[i].symbol << " ";
     cout << endl;
+}
+
+void print(list<token_info> l)
+{
+    for (int i = 0; i < l.size(); i++)
+    {
+        if (l[i].token < names.size())
+            print(names[l[i].token]);
+        else
+            cout << "PANIC: " << l[i].token;
+        cout << ": ";
+#ifdef _WIN32
+        int len = WideCharToMultiByte(
+            CP_ACP, 0, l[i].lexeme, wcslen(l[i].lexeme), NULL, 0, 0, NULL);
+#else
+        int len = wcstombs(NULL, l[i].lexeme, 0);
+#endif
+        char *str = (char *)malloc(sizeof(wchar_t) * (len + 1));
+#ifdef _WIN32
+        WideCharToMultiByte(
+            CP_ACP, 0, l[i].lexeme, wcslen(l[i].lexeme), str, len, 0, NULL);
+#else
+        wcstombs(str, l[i].lexeme, len);
+#endif
+        str[len] = '\0';
+        cout << str << endl;
+        free(str);
+    }
 }
