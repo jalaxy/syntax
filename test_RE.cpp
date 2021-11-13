@@ -2,9 +2,58 @@
 #include <cstring>
 #include <ctime>
 #include "FA.h"
-// #include <iostream>
+#include <iostream>
 using namespace std;
-fstream cin, cout;
+// fstream cin, cout;
+void print(expr e)
+{
+    cout << e.lhs << " = ";
+    for (int i = 0; i < e.rhs.size(); i++)
+        switch (e.rhs[i])
+        {
+        case OP_ALTER:
+            cout << "|";
+            break;
+        case OP_CMPLM:
+            cout << "~";
+            break;
+        case OP_CNCAT:
+            cout << ".";
+            break;
+        case OP_KLCLS:
+            cout << "*";
+            break;
+        case OP_LPRTH:
+            cout << "(";
+            break;
+        case OP_MINUS:
+            cout << "-";
+            break;
+        case OP_OPTNL:
+            cout << "?";
+            break;
+        case OP_PTCLS:
+            cout << "+";
+            break;
+        case OP_RPRTH:
+            cout << ")";
+            break;
+        case EPSILON:
+            cout << "#";
+            break;
+        case TERMINAL:
+            cout << "$";
+            break;
+        default:
+            cout << e.rhs[i];
+        }
+    cout << endl;
+}
+void print(list<expr> l)
+{
+    for (int i = 0; i < l.size(); i++)
+        print(l[i]);
+}
 void print(fa nfa)
 {
     cout << "sigma:\t[0, " << nfa.sigma_range << ")\n";
@@ -18,7 +67,7 @@ void print(fa nfa)
     for (int i = 0; i < nfa.g.size(); i++)
     {
         cout << "\t" << nfa.g[i].data.value << "\t" << &nfa.g[i];
-        if (nfa.g[i].data.token == NON_TERMINAL)
+        if (nfa.g[i].data.token == NON_ACC)
             cout << "\t";
         else
             cout << "\t" << nfa.g[i].data.token;
@@ -37,8 +86,8 @@ void print(fa nfa)
 int main()
 {
     list<expr> relist;
-    cin.open("test_RE.in", ios::in);
-    cout.open("test_RE.out", ios::out);
+    // cin.open("test_RE.in", ios::in);
+    // cout.open("test_RE.out", ios::out);
     unsigned int token = 0;
     while (!cin.fail())
     {
@@ -50,44 +99,48 @@ int main()
             cin.getline(s, size);
             if (cin.fail() || s[0] == '\0')
                 break;
-            unsigned int *a = new unsigned int[size];
-            for (int i = 0; i < strlen(s); i++)
+            list<unsigned int> a;
+            for (int i = 0; i < (int)strlen(s); i++)
                 switch (s[i])
                 {
                 case ' ':
                 case '\t':
                     break;
                 case '|':
-                    a[i] = OP_ALTER;
+                    a.append(OP_ALTER);
                     break;
                 case '*':
-                    a[i] = OP_KLCLS;
+                    a.append(OP_KLCLS);
+                    break;
+                case '~':
+                    a.append(OP_CMPLM);
                     break;
                 case '.':
-                    a[i] = OP_CNCAT;
+                    a.append(OP_CNCAT);
                     break;
                 case '(':
-                    a[i] = OP_LPRTH;
+                    a.append(OP_LPRTH);
                     break;
                 case ')':
-                    a[i] = OP_RPRTH;
+                    a.append(OP_RPRTH);
+                    break;
+                case '!':
+                    a.append(EPSILON);
                     break;
                 default:
-                    a[i] = s[i];
+                    a.append(s[i]);
                     break;
                 }
-            a[strlen(s)] = OP_TRMNL;
-            relist.append(expr(token++, a));
-            delete[] a;
+            relist.append({token++, a});
+            cout << (ContainEpsilon({token++, a}) ? "true\n" : "false\n");
         }
         fa nfa;
-        id = 0;
         clock_t t_s = clock();
-        bool valid = REToNFA(relist, nfa) ? "true" : "false";
+        bool valid = REToNFA(relist, nfa);
         cout << "Size: " << relist.size() << endl;
         cout << "Expression: " << s << endl;
         cout << "Elapsed time is " << clock() - t_s << " ms\n";
-        cout << valid << endl;
+        cout << (valid ? "true" : "false") << endl;
         print(nfa);
         delete[] s;
     }

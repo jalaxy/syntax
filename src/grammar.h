@@ -1,6 +1,6 @@
 /****************************************************************
  * @file grammar.h
- * @author Name (username@domain.com)
+ * @author Jiang, Xingyu (chinajxy@outlook.com)
  * @brief Data structures and functions to process grammar
  * @version 0.1
  * @date 2021-10-24
@@ -13,11 +13,10 @@
 
 #include "list.h"
 #include "FA.h"
-using namespace std;
 
 #define HASH_SZ 1024
 #define LL1_PARSING_ERROR ((unsigned int)0xffffffff)
-#define LL1_PARSING_TERMINAL ((unsigned int)0xffffffff)
+#define LR1_REDUCTION ((unsigned int)0x7ffffffe)
 
 struct prod
 {
@@ -25,18 +24,18 @@ struct prod
     list<list<unsigned int>> expression; // concatenate of the elements
 };
 
+struct prod_single
+{
+    unsigned int variable;
+    list<unsigned int> expression;
+};
+
 struct parsing_tree
 {
+    int id;
     unsigned int symbol;
     token_info token;
     list<parsing_tree> subtree;
-};
-
-class grammar
-{
-public:
-    list<prod> productions;
-    prod *s;
 };
 
 struct hash_symbol_info
@@ -50,6 +49,52 @@ struct hash_string_info
 {
     int idx;
     list<wchar_t> str;
+};
+
+struct lr0_item
+{
+    prod_single pd;
+    int dot;
+};
+
+struct lr1_item
+{
+    prod_single pd;
+    int dot;
+    unsigned int sym;
+};
+
+struct hash_lr0_items_info
+{
+    int idx;
+    lr0_item item;
+};
+
+struct hash_lr1_items_info
+{
+    int idx;
+    lr1_item item;
+};
+
+struct action_info
+{
+    enum move_enum
+    {
+        SHIFT,
+        REDUCE,
+        ACCEPT,
+        ERROR
+    } mov;
+    prod pd;
+    int s;
+};
+
+class grammar
+{
+public:
+    list<prod> productions;
+    prod *s;
+    void augment();
 };
 
 class ll1_parsing_table
@@ -67,18 +112,51 @@ public:
     ll1_parsing_table(grammar g);
     ~ll1_parsing_table();
     const ll1_parsing_table &operator=(const ll1_parsing_table &b);
-    const hash_symbol_info *query_symbol(unsigned int symbol);
     int get_row();
     int get_col();
     unsigned int get_start();
+    const list<hash_symbol_info> *get_index();
     list<unsigned int> *operator[](int idx);
+};
+
+class lr1_parsing_table
+{
+private:
+    int row, col;
+    int *table;
+    unsigned int *token;
+    int reduction_size;
+    prod_single *reductions;
+    int terminal_head;
+    list<hash_symbol_info> *aidx;
+    int s;
+    int err_code;
+    void copy(const lr1_parsing_table &b);
+    list<unsigned int> calc_first(grammar &g, unsigned int variable, bool init = true);
+
+public:
+    lr1_parsing_table(const lr1_parsing_table &b);
+    lr1_parsing_table(grammar g);
+    ~lr1_parsing_table();
+    const lr1_parsing_table &operator=(const lr1_parsing_table &b);
+    const int get_start();
+    const list<hash_symbol_info> *get_index();
+    const int get_terminal_head();
+    const prod_single &get_reduction(int idx);
+    unsigned int get_token(int idx);
+    int get_error_code();
+    int get_row();
+    int get_col();
+    int *operator[](int idx);
 };
 
 bool EBNFToGrammar(list<expr> ebnflist, list<expr> &relist, unsigned int s, grammar &g,
                    bool detect_regular = true);
+// EBNF to RE -> EBNF to FA will require less time
 int ReadEBNFFromString(wchar_t *wbuf, list<expr> &ebnflist, unsigned int &start, list<expr> &relist,
                        list<unsigned int> &sep, list<list<wchar_t>> &names);
 bool LL1Parsing(ll1_parsing_table t_ll1, dfa_table t_fa, parsing_tree &tr, const wchar_t *str);
+bool LR1Parsing(lr1_parsing_table t_lr1, dfa_table t_fa, parsing_tree &tr, const wchar_t *str);
 
 // Extended Backus-Naur Form (EBNF) notation, from XML specification
 // Reference link: https://www.w3.org/TR/xml/

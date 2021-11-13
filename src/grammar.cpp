@@ -1,6 +1,6 @@
 /****************************************************************
  * @file grammar.cpp
- * @author Name (username@domain.com)
+ * @author Jiang, Xingyu (chinajxy@outlook.com)
  * @brief Function definitions of grammar.h
  * @version 0.1
  * @date 2021-10-24
@@ -10,6 +10,95 @@
  ****************************************************************/
 
 #include "grammar.h"
+
+/**
+ * @brief Hash function
+ * 
+ * @param l the string
+ * @return hash value
+ */
+int h(list<wchar_t> &l)
+{
+    int ans = 0;
+    for (int i = 0; i < l.size(); i++)
+        ans = (ans * 0x80 + l[i]) % HASH_SZ;
+    return ans;
+}
+
+/**
+ * @brief Hash function
+ * 
+ * @param i the LR(0) item
+ * @return hash value
+ */
+int h(lr0_item &i)
+{
+    unsigned int ans = i.pd.variable;
+    for (int j = 0; j < i.pd.expression.size(); j++)
+        ans = (ans * 10 + i.pd.expression[j]) % HASH_SZ;
+    return (ans + i.dot) % HASH_SZ;
+}
+
+/**
+ * @brief Hash function
+ * 
+ * @param l the LR(1) item
+ * @return hash value
+ */
+int h(lr1_item &i)
+{
+    unsigned int ans = i.pd.variable;
+    for (int j = 0; j < i.pd.expression.size(); j++)
+        ans = (ans * 10 + i.pd.expression[j]) % HASH_SZ;
+    return (ans + i.dot + i.sym) % HASH_SZ;
+}
+
+/**
+ * @brief Get infomation of a symbol
+ * 
+ * @param symbol the symbol to query
+ * @return infomation including symbol type and index, NULL if not exist
+ */
+const hash_symbol_info *QuerySymbol(const list<hash_symbol_info> *aidx, unsigned int symbol)
+{
+    for (int i = 0; i < aidx[symbol % HASH_SZ].size(); i++)
+        if (((list<hash_symbol_info> *)aidx)[symbol % HASH_SZ][i].symbol == symbol)
+            return &((list<hash_symbol_info> *)aidx)[symbol % HASH_SZ][i];
+    return NULL;
+}
+
+/**
+ * @brief The calculation of hash table
+ * 
+ * @param g the grammar
+ * @param aidx the result hash table array
+ * @return the number of regular language, which is not appearing in LHS
+ */
+int CalcHash(grammar &g, list<hash_symbol_info> *aidx)
+{
+    int col = 0;
+    for (int i = 0; i < g.productions.size(); i++)
+        aidx[g.productions[i].variable % HASH_SZ].append({false, i, g.productions[i].variable});
+    list<unsigned int> re_sym;
+    for (int i = 0; i < g.productions.size(); i++)
+        for (int j = 0; j < g.productions[i].expression.size(); j++)
+            for (int k = 0; k < g.productions[i].expression[j].size(); k++)
+                if (QuerySymbol(aidx, g.productions[i].expression[j][k]) == NULL)
+                    re_sym.append(g.productions[i].expression[j][k]);
+    re_sym.set_reduce();
+    for (int i = 0; i < re_sym.size(); i++)
+        aidx[re_sym[i] % HASH_SZ].append({true, col++, re_sym[i]});
+    aidx[TERMINAL % HASH_SZ].append({true, col++, TERMINAL});
+    return col;
+}
+
+void grammar::augment()
+{
+    productions.push_front({AUGMNTED, list<list<unsigned int>>()});
+    productions.bottom().expression.push_back(list<unsigned int>());
+    productions.bottom().expression.top().push_back(s->variable);
+    s = &productions.bottom();
+}
 
 /**
  * @brief Copy from another object
@@ -25,6 +114,7 @@ void ll1_parsing_table::copy(const ll1_parsing_table &b)
     {
         table = NULL;
         aidx = NULL;
+        s = EPSILON;
     }
     else
     {
@@ -50,8 +140,6 @@ void ll1_parsing_table::copy(const ll1_parsing_table &b)
  */
 ll1_parsing_table::ll1_parsing_table(grammar g)
 {
-    row = g.productions.size();
-    col = 0;
     aidx = new (std::nothrow) list<hash_symbol_info>[HASH_SZ];
     if (aidx == NULL)
     {
@@ -59,18 +147,8 @@ ll1_parsing_table::ll1_parsing_table(grammar g)
         HANDLE_MEMORY_EXCEPTION;
 #endif
     }
-    for (int i = 0; i < row; i++)
-        aidx[g.productions[i].variable % HASH_SZ].append({false, i, g.productions[i].variable});
-    list<unsigned int> re_sym;
-    for (int i = 0; i < row; i++)
-        for (int j = 0; j < g.productions[i].expression.size(); j++)
-            for (int k = 0; k < g.productions[i].expression[j].size(); k++)
-                if (query_symbol(g.productions[i].expression[j][k]) == NULL)
-                    re_sym.append(g.productions[i].expression[j][k]);
-    re_sym.set_reduce();
-    for (int i = 0; i < re_sym.size(); i++)
-        aidx[re_sym[i] % HASH_SZ].append({true, col++, re_sym[i]});
-    aidx[LL1_PARSING_TERMINAL % HASH_SZ].append({true, col++, LL1_PARSING_TERMINAL});
+    row = g.productions.size();
+    col = CalcHash(g, aidx);
     table = new (std::nothrow) list<unsigned int>[row * col];
     if (table == NULL)
     {
@@ -92,13 +170,13 @@ ll1_parsing_table::ll1_parsing_table(grammar g)
     for (int i = 0; i < row; i++)
         if (first[i].empty())
             calc_first(g, first, g.productions[i].variable);
-    // B -> beta A alpha    =>  FOLLOW(A) |= FIRST(alpha) | (epsilon in alpha ? FOLLOW(B))
+    // B -> beta A alpha    =>  FOLLOW(A) |= FIRST(alpha) | (epsilon in FIRST(alpha) ? FOLLOW(B))
     // B -> beta A          =>  FOLLOW(A) |= FOLLOW(B)
     bool finished = false;
     for (int i = 0; i < aidx[g.s->variable % HASH_SZ].size(); i++)
         if (aidx[g.s->variable % HASH_SZ][i].symbol == g.s->variable)
         {
-            follow[aidx[g.s->variable % HASH_SZ][i].idx].append(LL1_PARSING_TERMINAL);
+            follow[aidx[g.s->variable % HASH_SZ][i].idx].append(TERMINAL);
             break;
         }
     while (!finished)
@@ -111,7 +189,8 @@ ll1_parsing_table::ll1_parsing_table(grammar g)
                 cur_first.append(EPSILON);
                 for (int k = g.productions[i].expression[j].size() - 1; k >= 0; k--)
                 {
-                    const hash_symbol_info *p_info = query_symbol(g.productions[i].expression[j][k]);
+                    const hash_symbol_info *p_info =
+                        QuerySymbol(aidx, g.productions[i].expression[j][k]);
                     if (p_info->regular)
                     {
                         cur_first = list<unsigned int>();
@@ -124,7 +203,8 @@ ll1_parsing_table::ll1_parsing_table(grammar g)
                         if (cur_first.top() == EPSILON)
                         {
                             follow[p_info->idx].pop_back();
-                            follow[p_info->idx] += follow[query_symbol(g.productions[i].variable)->idx];
+                            follow[p_info->idx] +=
+                                follow[QuerySymbol(aidx, g.productions[i].variable)->idx];
                         }
                         if (first[p_info->idx].top() == EPSILON)
                         {
@@ -149,7 +229,7 @@ ll1_parsing_table::ll1_parsing_table(grammar g)
             int k;
             for (k = 0; k < g.productions[i].expression[j].size(); k++)
             {
-                const hash_symbol_info *p_info = query_symbol(g.productions[i].expression[j][k]);
+                const hash_symbol_info *p_info = QuerySymbol(aidx, g.productions[i].expression[j][k]);
                 if (p_info->regular)
                     first_of_this.append(p_info->symbol);
                 else
@@ -164,7 +244,7 @@ ll1_parsing_table::ll1_parsing_table(grammar g)
             first_of_this.set_reduce();
             for (k = 0; k < first_of_this.size(); k++)
             {
-                const hash_symbol_info *p_info = query_symbol(first_of_this[k]);
+                const hash_symbol_info *p_info = QuerySymbol(aidx, first_of_this[k]);
                 if (table[i * col + p_info->idx].size() == 1 &&
                     table[i * col + p_info->idx].top() == LL1_PARSING_ERROR)
                     table[i * col + p_info->idx] = g.productions[i].expression[j];
@@ -178,6 +258,7 @@ ll1_parsing_table::ll1_parsing_table(grammar g)
                     aidx = NULL;
                     col = 0;
                     row = 0;
+                    s = EPSILON;
                     return;
                 }
             }
@@ -204,14 +285,14 @@ void ll1_parsing_table::calc_first(
     //             (epsilon in FIRST(alpha_2) ? (FIRST(alpha_3) |
     //                 ... |
     //                     epsilon in FIRST(alpha_n) ? epsilon))));
-    const hash_symbol_info *p_info = query_symbol(variable);
+    const hash_symbol_info *p_info = QuerySymbol(aidx, variable);
     for (int i = 0; i < g.productions[p_info->idx].expression.size(); i++)
     {
         int j;
         for (j = 0; j < g.productions[p_info->idx].expression[i].size(); j++)
         {
             const hash_symbol_info *p_info_j =
-                query_symbol(g.productions[p_info->idx].expression[i][j]);
+                QuerySymbol(aidx, g.productions[p_info->idx].expression[i][j]);
             if (p_info_j->regular)
                 first[p_info->idx].append(p_info_j->symbol);
             else
@@ -229,20 +310,6 @@ void ll1_parsing_table::calc_first(
             first[p_info->idx].append(EPSILON);
     }
     first[p_info->idx].set_reduce();
-}
-
-/**
- * @brief Get infomation of a symbol
- * 
- * @param symbol the symbol to query
- * @return infomation including symbol type and index, NULL if not exist
- */
-const hash_symbol_info *ll1_parsing_table::query_symbol(unsigned int symbol)
-{
-    for (int i = 0; i < aidx[symbol % HASH_SZ].size(); i++)
-        if (aidx[symbol % HASH_SZ][i].symbol == symbol)
-            return &aidx[symbol % HASH_SZ][i];
-    return NULL;
 }
 
 /**
@@ -286,6 +353,13 @@ int ll1_parsing_table::get_col() { return col; }
 unsigned int ll1_parsing_table::get_start() { return s; }
 
 /**
+ * @brief 
+ * 
+ * @return const list<hash_symbol_info>* 
+ */
+const list<hash_symbol_info> *ll1_parsing_table::get_index() { return aidx; }
+
+/**
  * @brief Get the element of parsing table
  * 
  * @param idx the row index
@@ -319,6 +393,405 @@ const ll1_parsing_table &ll1_parsing_table::operator=(const ll1_parsing_table &b
 bool operator<(const prod &a, const prod &b) { return a.variable < b.variable; }
 
 /**
+ * @brief Comparison between two productions
+ * 
+ * @param a one production
+ * @param b the other productions
+ * @return whether two productions are the same
+ */
+bool operator==(const prod &a, const prod &b)
+{
+    return a.expression == b.expression && a.variable == b.variable;
+}
+
+/**
+ * @brief Comparison between two LR(0) items
+ * 
+ * @param a one item
+ * @param b another item
+ * @return whether two LR(0) items are the same
+ */
+bool operator==(const lr0_item &a, const lr0_item &b)
+{
+    return a.pd.variable == b.pd.variable &&
+           a.pd.expression == b.pd.expression && a.dot == b.dot;
+}
+
+/**
+ * @brief Comparison between two LR(1) items
+ * 
+ * @param a one item
+ * @param b the other item
+ * @return whether two LR(1) items are the same
+ */
+bool operator==(const lr1_item &a, const lr1_item &b)
+{
+    return a.pd.variable == b.pd.variable &&
+           a.pd.expression == b.pd.expression &&
+           a.dot == b.dot && a.sym == b.sym;
+}
+
+/**
+ * @brief Calculation of FIRST(variable)
+ * 
+ * @param g the grammar
+ * @param variable the variable
+ * @return the list of FIRST
+ */
+list<unsigned int> lr1_parsing_table::calc_first(grammar &g, unsigned int variable, bool init)
+{
+    static bool *v;
+    if (init)
+    {
+        v = (bool *)malloc(sizeof(bool) * g.productions.size());
+        if (v == NULL)
+        {
+#ifdef HANDLE_MEMORY_EXCEPTION
+            HANDLE_MEMORY_EXCEPTION;
+#endif
+        }
+        memset(v, 0, sizeof(bool) * g.productions.size());
+    }
+    const hash_symbol_info *p_info = QuerySymbol(aidx, variable);
+    v[p_info->idx] = true;
+    list<unsigned int> l;
+    for (int i = 0; i < g.productions[p_info->idx].expression.size(); i++)
+    {
+        int j;
+        for (j = 0; j < g.productions[p_info->idx].expression[i].size(); j++)
+        {
+            const hash_symbol_info *q_info =
+                QuerySymbol(aidx, g.productions[p_info->idx].expression[i][j]);
+            if (q_info->regular)
+                l.append(q_info->symbol);
+            else if (!v[q_info->idx])
+                l += calc_first(g, q_info->symbol, false);
+            if (l.top() == EPSILON)
+                l.pop_back();
+            else
+                break;
+        }
+        if (j == g.productions[p_info->idx].expression[i].size())
+            l.append(EPSILON);
+    }
+    l.set_reduce();
+    if (init && v != NULL)
+        free(v);
+    return l;
+}
+
+/**
+ * @brief Copy from another object
+ * 
+ * @param b 
+ */
+void lr1_parsing_table::copy(const lr1_parsing_table &b)
+{
+    err_code = b.err_code;
+    if (err_code != 0)
+        return;
+    s = b.s;
+    row = b.row;
+    col = b.col;
+    terminal_head = b.terminal_head;
+    reduction_size = b.reduction_size;
+    table = (int *)malloc(sizeof(int) * row * col);
+    token = (unsigned int *)malloc(sizeof(unsigned int) * row);
+    reductions = new (std::nothrow) prod_single[reduction_size];
+    aidx = new (std::nothrow) list<hash_symbol_info>[HASH_SZ];
+    if (table == NULL || reductions == NULL || aidx == NULL || token == NULL)
+    {
+#ifdef HANDLE_MEMORY_EXCEPTION
+        HANDLE_MEMORY_EXCEPTION;
+#endif
+    }
+    memcpy(table, b.table, row * col * sizeof(int));
+    memcpy(token, b.token, row * sizeof(unsigned int));
+    for (int i = 0; i < reduction_size; i++)
+        reductions[i] = b.reductions[i];
+    for (int i = 0; i < HASH_SZ; i++)
+        aidx[i] = b.aidx[i];
+}
+
+/**
+ * @brief Construct a new LR(1) parsing table object
+ * 
+ * @param b another object
+ */
+lr1_parsing_table::lr1_parsing_table(const lr1_parsing_table &b) { copy(b); }
+
+/**
+ * @brief Construct a new LR(1) parsing table object
+ * 
+ * @param g a context-free grammar
+ */
+lr1_parsing_table::lr1_parsing_table(grammar g)
+{
+    err_code = 0; // no exception
+    g.augment();
+    aidx = new (std::nothrow) list<hash_symbol_info>[HASH_SZ];
+    list<hash_lr0_items_info> *aidx_item_0 = new (std::nothrow) list<hash_lr0_items_info>[HASH_SZ];
+    list<hash_lr1_items_info> *aidx_item_1 = new (std::nothrow) list<hash_lr1_items_info>[HASH_SZ];
+    list<unsigned int> *first = new (std::nothrow) list<unsigned int>[g.productions.size()];
+    if (aidx == NULL || token == NULL || aidx_item_0 == NULL || aidx_item_1 == NULL || first == NULL)
+    {
+#ifdef HANDLE_MEMORY_EXCEPTION
+        HANDLE_MEMORY_EXCEPTION;
+#endif
+    }
+    // symbols: 0 ~ variables - 1, variables ~ variables + terminals - 1
+    col = (terminal_head = g.productions.size()) + CalcHash(g, aidx);
+    for (int i = 0; i < g.productions.size(); i++)
+        first[i] = calc_first(g, g.productions[i].variable); // can be optimized
+    unsigned int id = 0, vp = 0;                             // viable prefix
+    list<lr1_item> items;
+    list<prod_single> reduclist;
+    list<list<unsigned int>> reducsymbol;
+    fa nfa;
+    nfa.g.remove_vertex(0);
+    nfa.g.add_vertex({id++, NON_ACC});
+    items.append({{g.s->variable, g.s->expression.top()}, 0, TERMINAL}); // S' -> .S, $
+    aidx_item_1[h(items.top()) % HASH_SZ].append({0, items.top()});
+    nfa.s = &nfa.g[0];
+    for (int i = 0; i < nfa.g.size(); i++)
+    {
+        if (items[i].dot < items[i].pd.expression.size())
+        {
+            unsigned symbol_after_dot = items[i].pd.expression[items[i].dot];
+            const hash_symbol_info *p_info = QuerySymbol(aidx, symbol_after_dot);
+            lr1_item item_shift = items[i];
+            item_shift.dot++;
+            int j;
+            list<hash_lr1_items_info> &info = aidx_item_1[h(item_shift) % HASH_SZ];
+            for (j = 0; j < info.size(); j++)
+                if (info[j].item == item_shift)
+                    break;
+            if (j == info.size()) // not found
+            {
+                nfa.g.add_vertex({id++, NON_ACC});
+                nfa.g.add_edge(nfa.g[i], nfa.g.top(), {symbol_after_dot});
+                items.append(item_shift);
+                info.append({items.size() - 1, item_shift});
+            }
+            else
+                nfa.g.add_edge(i, info[j].idx, {symbol_after_dot});
+            if (!p_info->regular)
+                for (int j = 0; j < g.productions[p_info->idx].expression.size(); j++)
+                // for (int k = 0; k < g.productions[p_info->idx].expression[j].size(); k++)
+                {
+                    lr1_item item_closure =
+                        {{g.productions[p_info->idx].variable,
+                          g.productions[p_info->idx].expression[j]},
+                         0};
+                    list<unsigned int> first_bta; // FIRST(beta a)
+                    first_bta.append(EPSILON);
+                    for (int l = items[i].dot + 1; l < items[i].pd.expression.size(); l++)
+                    {
+                        const hash_symbol_info *p_info =
+                            QuerySymbol(aidx, items[i].pd.expression[l]);
+                        if (first_bta.top() == EPSILON)
+                            first_bta.pop_back();
+                        else
+                            break;
+                        if (p_info->regular)
+                            first_bta.append(p_info->symbol);
+                        else
+                            first_bta += first[p_info->idx];
+                    }
+                    first_bta.set_reduce();
+                    if (first_bta.top() == EPSILON)
+                    {
+                        first_bta.pop_back();
+                        first_bta.append(items[i].sym);
+                    }
+                    for (int s = 0; s < first_bta.size(); s++)
+                    {
+                        item_closure.sym = first_bta[s];
+                        int l = 0;
+                        list<hash_lr1_items_info> &info = aidx_item_1[h(item_closure) % HASH_SZ];
+                        for (l = 0; l < info.size(); l++)
+                            if (info[l].item == item_closure)
+                                break;
+                        if (l == info.size())
+                        {
+                            nfa.g.add_vertex({id++, NON_ACC});
+                            nfa.g.add_edge(nfa.g[i], nfa.g.top(), {EPSILON});
+                            items.append(item_closure);
+                            info.append({items.size() - 1, item_closure});
+                        }
+                        else
+                            nfa.g.add_edge(i, info[l].idx, {EPSILON});
+                    }
+                }
+        }
+        else
+        {
+            int j;
+            lr0_item item_0 = {items[i].pd, items[i].dot};
+            list<hash_lr0_items_info> &info = aidx_item_0[h(item_0)];
+            for (j = 0; j < info.size(); j++)
+                if (info[j].item == item_0)
+                    break;
+            if (j == info.size())
+            {
+                info.append({(int)vp++, item_0});
+                reduclist.append(item_0.pd);
+                reducsymbol.append(list<unsigned int>());
+            }
+            nfa.g[i].data.token = (unsigned int)info[j].idx;
+            reducsymbol[info[j].idx].append(items[i].sym);
+        }
+    }
+    NFAToDFA(nfa, nfa);
+    MinimizeDFA(nfa);
+    delete[] first;
+    delete[] aidx_item_0;
+    delete[] aidx_item_1;
+    reductions = new (std::nothrow) prod_single[reduclist.size()];
+    if (reductions == NULL)
+    {
+#ifdef HANDLE_MEMORY_EXCEPTION
+        HANDLE_MEMORY_EXCEPTION;
+#endif
+    }
+    reduction_size = reduclist.size();
+    for (int i = 0; i < reduction_size; i++)
+        reductions[i] = reduclist[i];
+    nfa.g.add_vertex({id++, LR1_REDUCTION});
+    nfa.f.append(&nfa.g.top());
+    row = nfa.g.size();
+    table = (int *)malloc(sizeof(int) * row * col);
+    token = (unsigned int *)malloc(sizeof(unsigned int) * row);
+    for (int i = 0; i < row - 1; i++)
+        if (nfa.g[i].data.token != NON_ACC)
+            for (int j = 0; j < reducsymbol[nfa.g[i].data.token].size(); j++)
+                nfa.g.add_edge(nfa.g[i], nfa.g.top(), {reducsymbol[nfa.g[i].data.token][j]});
+    for (int i = 0; i < row; i++)
+        token[i] = nfa.g[i].data.token;
+    for (int i = 0; i < row; i++)
+        for (int j = 0; j < col; j++)
+            table[i * col + j] = UNDEFINED;
+    for (int i = 0; i < row; i++)
+        nfa.g[i].aux = (vertex_t *)i;
+    for (int i = 0; i < row; i++)
+    {
+        if (nfa.s == &nfa.g[i])
+            s = i;
+        for (int j = 0; j < nfa.g[i].size(); j++)
+        {
+            const hash_symbol_info *p_info = QuerySymbol(aidx, nfa.g[i][j].data.value);
+            int j_col = p_info->idx + (p_info->regular ? g.productions.size() : 0);
+            if (table[i * col + j_col] == UNDEFINED)
+                table[i * col + j_col] = (int)(long long)nfa.g[i][j].to->aux;
+            else
+                err_code = 1;
+        }
+    }
+}
+
+/**
+ * @brief Destroy the lr1 parsing table object
+ * 
+ */
+lr1_parsing_table::~lr1_parsing_table()
+{
+    if (reductions != NULL)
+        delete[] reductions;
+    if (aidx != NULL)
+        delete[] aidx;
+    if (table != NULL)
+        free(table);
+    if (token != NULL)
+        free(token);
+}
+
+/**
+ * @brief Assignment function
+ * 
+ * @param b 
+ * @return reference to this object
+ */
+const lr1_parsing_table &lr1_parsing_table::operator=(const lr1_parsing_table &b)
+{
+    if (reductions != NULL)
+        delete[] reductions;
+    if (aidx != NULL)
+        delete[] aidx;
+    if (table != NULL)
+        free(table);
+    if (token != NULL)
+        free(token);
+    copy(b);
+    return *this;
+}
+
+/**
+ * @brief Get the start symbol
+ * 
+ * @return the start symbol
+ */
+const int lr1_parsing_table::get_start() { return s; }
+
+/**
+ * @brief Get the hash array
+ * 
+ * @return the hash table array
+ */
+const list<hash_symbol_info> *lr1_parsing_table::get_index() { return aidx; }
+
+/**
+ * @brief Get the size of variables
+ * 
+ * @return the head of terminals
+ */
+const int lr1_parsing_table::get_terminal_head() { return terminal_head; }
+
+/**
+ * @brief Get the idx-th reduction rule
+ * 
+ * @param idx the index
+ * @return the idx-th reduction
+ */
+const prod_single &lr1_parsing_table::get_reduction(int idx) { return reductions[idx]; }
+
+/**
+ * @brief Get the idx-th reduction token
+ * 
+ * @param idx the index
+ * @return the token value of idx-th state
+ */
+unsigned int lr1_parsing_table::get_token(int idx) { return token[idx]; }
+
+/**
+ * @brief Get the error code
+ * 
+ * @return the error code
+ */
+int lr1_parsing_table::get_error_code() { return err_code; }
+
+/**
+ * @brief Get the row of parsing table
+ * 
+ * @return the number of rows
+ */
+int lr1_parsing_table::get_row() { return row; }
+
+/**
+ * @brief Get the column of parsing table
+ * 
+ * @return the number of columns
+ */
+int lr1_parsing_table::get_col() { return col; }
+
+/**
+ * @brief Index operator
+ * 
+ * @param idx the index
+ * @return address of idx-th row
+ */
+int *lr1_parsing_table::operator[](int idx) { return &table[idx * col]; }
+
+/**
  * @brief Recursion part of conversion from EBNF to grammar
  * 
  * @param ebnflist the list of ebnf expressions
@@ -339,7 +812,7 @@ bool EBNFToGrammarRecursion(
         return true;
     g.productions[idx].expression.pop_back();
     list<unsigned int> idx_stack;
-    ebnflist[idx].rhs.append(OP_RPRTH); // before restored, this ENBF cannot be copied!
+    ebnflist[idx].rhs.append(OP_RPRTH);
     list<unsigned int> type_stack;
     list<unsigned int> op_stack;
     op_stack.push_back(OP_LPRTH);
@@ -433,7 +906,7 @@ bool EBNFToGrammarRecursion(
                     {
                         list<unsigned int> ep;
                         ep.append(EPSILON);
-                        relist.append(relist[idx_stack.top()] | expr({NON_TERMINAL, ep}));
+                        relist.append(relist[idx_stack.top()] | expr({NON_ACC, ep}));
                         relist.top().lhs = id++;
                         aidx[relist.top().lhs % HASH_SZ].append(
                             {true, relist.size() - 1, relist.top().lhs});
@@ -793,23 +1266,14 @@ bool EBNFToGrammar(list<expr> ebnflist, list<expr> &relist, unsigned int s, gram
     // because the FA lexical rules cannot identify empty string, it needs to
     // be rolled back to grammars
     for (int i = 0; i < relist.size(); i++)
-    {
-        list<expr> one;
-        one.append(relist[i]);
-        fa nfa, dfa;
-        REToNFA(one, nfa);
-        NFAToDFA(nfa, dfa);
-        for (int j = 0; j < dfa.f.size(); j++)
-            if (dfa.f[j] == dfa.s) // accept epsilon
-            {
-                g.productions.append({relist[i].lhs, list<list<unsigned int>>()});
-                relist[i].lhs = id++;
-                g.productions.top().expression.append(list<unsigned int>());
-                g.productions.top().expression.top().append(relist[i].lhs);
-                g.productions.top().expression.append(list<unsigned int>());
-                break;
-            }
-    }
+        if (ContainEpsilon(relist[i])) // accept epsilon
+        {
+            g.productions.append({relist[i].lhs, list<list<unsigned int>>()});
+            relist[i].lhs = id++;
+            g.productions.top().expression.append(list<unsigned int>());
+            g.productions.top().expression.top().append(relist[i].lhs);
+            g.productions.top().expression.append(list<unsigned int>());
+        }
     relist.sort(0, relist.size() - 1);
     g.productions.sort(0, g.productions.size() - 1);
     return suc;
@@ -871,20 +1335,6 @@ int DetermineTerminal(list<unsigned int> &sep, unsigned int ch)
     }
     sep.pop_back();
     return idx;
-}
-
-/**
- * @brief Hash function
- * 
- * @param l the string
- * @return hash value
- */
-int h(list<wchar_t> &l)
-{
-    int ans = 0;
-    for (int i = 0; i < l.size(); i++)
-        ans = (ans * 0x80 + l[i]) % HASH_SZ;
-    return ans;
 }
 
 /**
@@ -1144,7 +1594,7 @@ int ReadEBNFFromString(wchar_t *wbuf, list<expr> &ebnflist, unsigned int &start,
                         m++;
                         right = wbuf[m];
                         if (m + 1 < l && wbuf[m] == L'#' && wbuf[m + 1] == L'x')
-                            m = GetInt(wbuf, wsz, m + 2, left);
+                            m = GetInt(wbuf, wsz, m + 2, right);
                         else
                             m++;
                     }
@@ -1153,22 +1603,28 @@ int ReadEBNFFromString(wchar_t *wbuf, list<expr> &ebnflist, unsigned int &start,
                     for (int n = DetermineTerminal(sep, left); n <= DetermineTerminal(sep, right); n++)
                         terminals.append(n + names.size());
                 }
+                terminals.set_reduce();
                 if (reverse)
-                    ebnflist[id_rsvd].rhs.append(OP_CMPLM);
+                {
+                    int p = 0;
+                    list<unsigned int> terminals_r;
+                    for (unsigned int q = 0; q < (unsigned int)relist.size(); q++)
+                        if (p < terminals.size() && q + names.size() == terminals[p])
+                            p++;
+                        else
+                            terminals_r.append(q + names.size());
+                    terminals = terminals_r;
+                }
                 if (terminals.empty())
                     ebnflist[id_rsvd].rhs.append(EPSILON);
                 else
                 {
-                    if (reverse)
-                        ebnflist[id_rsvd].rhs.append(OP_LPRTH);
                     ebnflist[id_rsvd].rhs.append(terminals[0]);
                     for (m = 1; m < terminals.size(); m++)
                     {
                         ebnflist[id_rsvd].rhs.append(OP_ALTER);
                         ebnflist[id_rsvd].rhs.append(terminals[m]);
                     }
-                    if (reverse)
-                        ebnflist[id_rsvd].rhs.append(OP_RPRTH);
                 }
                 hv = h(names[id_rsvd]);
                 for (m = 0; m < aidx[hv].size(); m++)
@@ -1278,23 +1734,27 @@ int ReadEBNFFromString(wchar_t *wbuf, list<expr> &ebnflist, unsigned int &start,
 /**
  * @brief LL(1) parsing
  * 
- * @param t parsing table
+ * @param t_ll1 parsing table
+ * @param t_fa FA to recognize tokens
  * @param tr the result parsing tree
  * @param str the input string
+ * @return whether acceptable
  */
 bool LL1Parsing(ll1_parsing_table t_ll1, dfa_table t_fa, parsing_tree &tr, const wchar_t *str)
 {
     list<token_info> tk;
     t_fa.token_stream(str, tk);
-    tk.append(token_info(LL1_PARSING_TERMINAL));
+    tk.append(token_info(TERMINAL));
     list<hash_symbol_info> st_hs; // hash infomation stack
     list<parsing_tree *> st_tr;   // tree node
-    st_hs.push_back(*t_ll1.query_symbol(LL1_PARSING_TERMINAL));
-    st_hs.push_back(*t_ll1.query_symbol(t_ll1.get_start()));
+    st_hs.push_back(*QuerySymbol(t_ll1.get_index(), TERMINAL));
+    st_hs.push_back(*QuerySymbol(t_ll1.get_index(), t_ll1.get_start()));
+    st_tr.push_back(NULL);
     st_tr.push_back(&tr);
-    int i = 0;
+    int i = 0, id = 0;
     tr = parsing_tree();
     tr.symbol = t_ll1.get_start();
+    tr.id = id++;
     while (i < tk.size())
     {
         if (st_hs.empty())
@@ -1303,13 +1763,14 @@ bool LL1Parsing(ll1_parsing_table t_ll1, dfa_table t_fa, parsing_tree &tr, const
         parsing_tree *cur_node = st_tr.top();
         st_hs.pop_back();
         st_tr.pop_back();
-        const hash_symbol_info *p_info = t_ll1.query_symbol(tk[i].token);
+        const hash_symbol_info *p_info = QuerySymbol(t_ll1.get_index(), tk[i].token);
         if (hs.regular)
             if (hs.symbol == p_info->symbol)
             {
                 if (cur_node != NULL)
                 {
                     cur_node->symbol = tk[i].token;
+                    cur_node->id = id++;
                     cur_node->token = tk[i];
                 }
                 i++;
@@ -1322,13 +1783,71 @@ bool LL1Parsing(ll1_parsing_table t_ll1, dfa_table t_fa, parsing_tree &tr, const
                     return false;
                 else
                 {
-                    st_hs.push_back(*t_ll1.query_symbol(t_ll1[hs.idx][p_info->idx][i]));
+                    st_hs.push_back(*QuerySymbol(t_ll1.get_index(), t_ll1[hs.idx][p_info->idx][i]));
                     cur_node->subtree.push_front(parsing_tree());
                     cur_node->subtree.bottom().symbol = st_hs.top().symbol;
+                    cur_node->subtree.bottom().id = id++;
                     st_tr.push_back(&cur_node->subtree.bottom());
                 }
     }
     if (!st_hs.empty())
         return false;
+    return true;
+}
+
+/**
+ * @brief LR(1) parsing
+ * 
+ * @param t_lr1 LR(1) parsing table
+ * @param t_fa FA to recognize tokens
+ * @param tr the output parsing tree
+ * @param str the input string
+ * @return whether acceptable
+ */
+bool LR1Parsing(lr1_parsing_table t_lr1, dfa_table t_fa, parsing_tree &tr, const wchar_t *str)
+{
+    list<token_info> tk;
+    bool tk_suc = t_fa.token_stream(str, tk);
+    if (!tk_suc)
+        return false;
+    tk.append(token_info(TERMINAL));
+    list<int> st_state;
+    st_state.push_back(t_lr1.get_start());
+    unsigned int start_symbol = AUGMNTED;
+    list<parsing_tree> st_buffer;
+    list<parsing_tree> st_input;
+    int id_tr = 0;
+    for (int i = 0; i < tk.size(); i++)
+        st_input.push_front({id_tr++, tk[i].token, tk[i]});
+    while (st_input.top().symbol != start_symbol)
+    {
+        int state = st_state.top();
+        const hash_symbol_info *p_info = QuerySymbol(t_lr1.get_index(), st_input.top().symbol);
+        int col = p_info->idx + (p_info->regular ? t_lr1.get_terminal_head() : 0);
+        if (t_lr1[state][col] == UNDEFINED)
+            return false; // error
+        else if (t_lr1.get_token(t_lr1[state][col]) == LR1_REDUCTION)
+        {
+            const prod_single &pd = t_lr1.get_reduction(t_lr1.get_token(state)); // reduce
+            list<parsing_tree> subtree;
+            for (int i = 0; i < pd.expression.size(); i++)
+            {
+                subtree.push_front(st_buffer.top());
+                st_buffer.pop_back();
+            }
+            for (int i = 0; i < pd.expression.size(); i++)
+                st_state.pop_back();
+            st_input.push_back({id_tr++, pd.variable, token_info(), subtree});
+        }
+        else
+        {
+            st_buffer.push_back(st_input.top()); // shift
+            st_state.push_back(t_lr1[state][col]);
+            st_input.pop_back();
+        }
+        if (st_input.empty())
+            return false;
+    }
+    tr = st_input.top();
     return true;
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  * @file FA.cpp
- * @author Name (username@domain.com)
+ * @author Jiang, Xingyu (chinajxy@outlook.com)
  * @brief Functions definition of FA.h
  * @version 0.1
  * @date 2021-10-15
@@ -37,7 +37,7 @@ expr expr::operator|(const expr &b) const
     RHS += OP_LPRTH;
     RHS += b.rhs;
     RHS += OP_RPRTH;
-    return {NON_TERMINAL, RHS};
+    return {NON_ACC, RHS};
 }
 
 /**
@@ -56,7 +56,7 @@ expr expr::operator<<(const expr &b) const
     RHS += OP_LPRTH;
     RHS += b.rhs;
     RHS += OP_RPRTH;
-    return {NON_TERMINAL, RHS};
+    return {NON_ACC, RHS};
 }
 
 /**
@@ -71,7 +71,7 @@ expr expr::operator*() const
     RHS += rhs;
     RHS += OP_RPRTH;
     RHS += OP_KLCLS;
-    return {NON_TERMINAL, RHS};
+    return {NON_ACC, RHS};
 }
 
 /**
@@ -86,7 +86,7 @@ expr expr::operator~() const
     RHS += OP_LPRTH;
     RHS += rhs;
     RHS += OP_RPRTH;
-    return {NON_TERMINAL, RHS};
+    return {NON_ACC, RHS};
 }
 
 /**
@@ -110,7 +110,7 @@ void fa::copy(const fa &b)
  */
 fa::fa()
 {
-    g.add_vertex({id++, NON_TERMINAL});
+    g.add_vertex({id++, NON_ACC});
     s = &g[0];
     sigma_range = 0;
 }
@@ -186,6 +186,9 @@ dfa_table::dfa_table(fa dfa, list<unsigned int> lsep)
 {
     row = dfa.g.size();
     col = dfa.sigma_range;
+    if (lsep.size() == 0)
+        for (int i = 1; i < col; i++)
+            lsep.append(i);
     if (lsep.size() != col - 1)
     {
         table = NULL;
@@ -516,7 +519,7 @@ bool operator<(const edge_info &a, const edge_info &b) { return a.value < b.valu
 fa &fa::operator|=(fa &b)
 {
     g.merge(b.g);
-    g.add_vertex({id++, NON_TERMINAL});
+    g.add_vertex({id++, NON_ACC});
     g.add_edge(g.top(), *s, {EPSILON});
     g.add_edge(g.top(), *b.s, {EPSILON});
     s = &g.top();
@@ -550,7 +553,7 @@ fa &fa::operator<<=(fa &b)
  */
 fa &fa::operator~()
 {
-    g.add_vertex({id++, NON_TERMINAL});
+    g.add_vertex({id++, NON_ACC});
     for (unsigned int i = 0; i < sigma_range; i++)
         g.add_edge(g.top(), g.top(), {(unsigned int)i});
     for (int i = 0; i < g.size() - 1; i++)
@@ -583,7 +586,7 @@ fa &fa::operator~()
  */
 fa &fa::operator*()
 {
-    g.add_vertex({id++, NON_TERMINAL});
+    g.add_vertex({id++, NON_ACC});
     g.add_edge(g.top(), *s, {EPSILON});
     for (int i = 0; i < f.size(); i++)
         g.add_edge(*f[i], g.top(), {EPSILON});
@@ -612,7 +615,7 @@ void NormalizeID(fa &nfa)
 fa AtomicFA(unsigned int sigma, unsigned int sigma_range)
 {
     fa a;
-    a.g.add_vertex({id++, NON_TERMINAL});
+    a.g.add_vertex({id++, NON_ACC});
     a.g.add_edge(0, 1, {sigma});
     a.s = &a.g[0];
     a.f.append(&a.g[1]);
@@ -707,6 +710,71 @@ bool REToNFA(list<expr> relist, fa &nfa, unsigned int symbol_range)
 }
 
 /**
+ * @brief Determine whether epsilon is in an RE
+ * 
+ * @param re the regular expression
+ * @return whether it contains epsilon
+ */
+bool ContainEpsilon(expr re)
+{
+    re.rhs.append(OP_RPRTH);
+    list<bool> tr_stack; // truth value stack
+    list<unsigned int> op_stack;
+    op_stack.push_back(OP_LPRTH);
+    int type = 0; // the next character type (operand: 0; operator: 1)
+    for (int j = 0; j < re.rhs.size(); j++)
+    {
+        unsigned int ch = re.rhs[j];
+        if ((ch == OP_RPRTH || ch == OP_KLCLS || ch == OP_CNCAT || ch == OP_ALTER ? 1 : 0) != type)
+            return false;
+        type = ch == OP_LPRTH || ch == OP_CNCAT || ch == OP_ALTER || ch == OP_CMPLM ? 0 : 1;
+        switch (ch)
+        {
+        case OP_LPRTH:
+            op_stack.push_back(OP_LPRTH);
+            break;
+        case OP_RPRTH:
+        case OP_KLCLS:
+        case OP_CMPLM:
+        case OP_CNCAT:
+        case OP_ALTER:
+            while (ch < op_stack.top() ||
+                   (ch == op_stack.top() && ch != OP_CMPLM))
+            {
+                switch (op_stack.top())
+                {
+                case OP_KLCLS:
+                    tr_stack.top() = true;
+                    break;
+                case OP_CMPLM:
+                    tr_stack.top() = !tr_stack.top();
+                    break;
+                case OP_CNCAT:
+                    tr_stack.undertop() &= tr_stack.top();
+                    tr_stack.pop_back();
+                    break;
+                case OP_ALTER:
+                    tr_stack.undertop() |= tr_stack.top();
+                    tr_stack.pop_back();
+                    break;
+                }
+                op_stack.pop_back();
+            }
+            if (ch == OP_RPRTH)
+                op_stack.pop_back();
+            else
+                op_stack.push_back(ch);
+            break;
+        default:
+            tr_stack.push_back(ch == EPSILON);
+            break;
+        }
+    }
+    re.rhs.pop_back();
+    return tr_stack.top();
+}
+
+/**
  * @brief Recursion part of rings elimination
  *
  * @param p the current vertex
@@ -751,7 +819,7 @@ void EliminateRings(fa &nfa)
         }
         if (found)
         {
-            nfa.g.add_vertex({id++, NON_TERMINAL});
+            nfa.g.add_vertex({id++, NON_ACC});
             for (int i = 0; i < st.size(); i++)
                 nfa.g.top().merge(*st[i]);
             for (int i = 0; i < nfa.g.size(); i++)
@@ -772,7 +840,7 @@ void EliminateRings(fa &nfa)
                 nfa.g[i].aux = (vertex_t *)-1;
             for (int i = 0; i < nfa.f.size(); i++)
                 nfa.f[i]->aux = (vertex_t *)(long long)i; // i is the index of nfa.f
-            nfa.g.top().data.token = NON_TERMINAL;
+            nfa.g.top().data.token = NON_ACC;
             bool tmnl = false;
             for (int i = 0; i < st.size(); i++)
             {
@@ -947,7 +1015,7 @@ void NFAToDFA(fa nfa, fa &dfa)
                 }
             if (k == aidx[hash].size())
             {
-                dfa.g.add_vertex({size++, NON_TERMINAL});
+                dfa.g.add_vertex({size++, NON_ACC});
                 dfa.g.top().aux = (vertex_t *)new (std::nothrow) list<vertex_t *>;
                 if (dfa.g.top().aux == NULL)
                 {
@@ -970,7 +1038,7 @@ void NFAToDFA(fa nfa, fa &dfa)
     {
         vertex_t &v = dfa.g[i];
         list<vertex_t *> &subset = *(list<vertex_t *> *)dfa.g[i].aux;
-        v.data.token = NON_TERMINAL;
+        v.data.token = NON_ACC;
         for (int j = 0; j < subset.size(); j++)
         {
             if (subset[j]->data.token < v.data.token)
@@ -1008,7 +1076,7 @@ void NFAToDFA(fa nfa, fa &dfa)
  */
 void MinimizeDFA(fa &dfa)
 {
-    dfa.g.add_vertex({UNDEFINED, NON_TERMINAL});
+    dfa.g.add_vertex({UNDEFINED, NON_ACC});
     list<int> group; // the group number of each dfa state
     for (int i = 0; i < dfa.g.size(); i++)
         group.append(0);
@@ -1050,7 +1118,7 @@ void MinimizeDFA(fa &dfa)
         }
         changed = false;
         for (int i = 0; i < next.size(); i++)
-            next[i].append(i); // next[i]: original-group, next_1, ..., next_n, graph-index
+            next[i].append(i); // next[i]: original-group, token, next_1, ..., next_n, graph-index
         next.sort(0, next.size() - 1);
         group[0] = group_id = 0;
         for (int i = 1; i < dfa.g.size(); i++)
@@ -1103,7 +1171,7 @@ void MinimizeDFA(fa &dfa)
         dfa.g.remove_vertex(rm_idx[i] - i);
     if (dfa.g.size() == 0)
     {
-        dfa.g.add_vertex({0, NON_TERMINAL});
+        dfa.g.add_vertex({0, NON_ACC});
         dfa.s = &dfa.g.top();
         dfa.f = list<vertex_t *>();
     }

@@ -1,6 +1,6 @@
 /****************************************************************
  * @file graph.h
- * @author Name (username@domain.com)
+ * @author Jiang, Xingyu (chinajxy@outlook.com)
  * @brief Implemention of a graph class, using adjancency list
  * @version 0.1
  * @date 2021-10-15

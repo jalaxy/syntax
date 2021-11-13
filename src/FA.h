@@ -1,6 +1,6 @@
 /****************************************************************
  * @file FA.h
- * @author Name (username@domain.com)
+ * @author Jiang, Xingyu (chinajxy@outlook.com)
  * @brief Data structures and functions to process finite automata
  * @version 0.1
  * @date 2021-10-15
@@ -16,18 +16,20 @@
 #include <cstring>
 #include <malloc.h>
 
-#define UNDEFINED ((int)0x7fffffff)             // undefined transition in DFA table
-#define NON_TERMINAL ((unsigned int)0xffffffff) // non-terminal state token
-#define EPSILON ((unsigned int)0xffffffff)      // value representing epsilon
-#define OP_KLCLS ((unsigned int)0xfffffffe)     // '*'
-#define OP_PTCLS ((unsigned int)0xfffffffd)     // '+'
-#define OP_OPTNL ((unsigned int)0xfffffffc)     // '?'
-#define OP_CMPLM ((unsigned int)0xfffffffb)     // '~'
-#define OP_CNCAT ((unsigned int)0xfffffffa)     // '.'
-#define OP_ALTER ((unsigned int)0xfffffff9)     // '|'
-#define OP_MINUS ((unsigned int)0xfffffff8)     // '-'
-#define OP_RPRTH ((unsigned int)0xfffffff7)     // ')'
-#define OP_LPRTH ((unsigned int)0xfffffff6)     // '('
+#define UNDEFINED ((int)0x7fffffff)         // undefined transition in DFA table
+#define NON_ACC ((unsigned int)0xffffffff)  // non-acceptance state token
+#define EPSILON ((unsigned int)0xffffffff)  // epsilon symbol
+#define TERMINAL ((unsigned int)0xfffffffe) // terminal symbol
+#define AUGMNTED ((unsigned int)0xfffffffd) // augmented grammar start symbol
+#define OP_KLCLS ((unsigned int)0xfffffffc) // '*'
+#define OP_PTCLS ((unsigned int)0xfffffffb) // '+'
+#define OP_OPTNL ((unsigned int)0xfffffffa) // '?'
+#define OP_CMPLM ((unsigned int)0xfffffff9) // '~'
+#define OP_CNCAT ((unsigned int)0xfffffff8) // '.'
+#define OP_ALTER ((unsigned int)0xfffffff7) // '|'
+#define OP_MINUS ((unsigned int)0xfffffff6) // '-'
+#define OP_RPRTH ((unsigned int)0xfffffff5) // ')'
+#define OP_LPRTH ((unsigned int)0xfffffff4) // '('
 
 struct edge_info
 {
@@ -67,7 +69,7 @@ public:
     unsigned int token;
     wchar_t *lexeme;
     token_info(const token_info &b);
-    token_info(unsigned int TOKEN = NON_TERMINAL, const wchar_t *LEXEME = NULL, int len = -1);
+    token_info(unsigned int TOKEN = NON_ACC, const wchar_t *LEXEME = NULL, int len = -1);
     token_info &operator=(const token_info &b);
     ~token_info();
 };
@@ -104,7 +106,7 @@ private:
 
 public:
     dfa_table(const dfa_table &b);
-    dfa_table(fa dfa, list<unsigned int> lsep);
+    dfa_table(fa dfa, list<unsigned int> lsep = list<unsigned int>());
     ~dfa_table();
     dfa_table &operator=(const dfa_table &b);
     int *operator[](int idx);
@@ -125,3 +127,4 @@ fa AtomicFA(unsigned int sigma, unsigned sigma_range = 0);
 bool REToNFA(list<expr> relist, fa &nfa, unsigned int symbol_range = 0);
 void NFAToDFA(fa nfa, fa &dfa);
 void MinimizeDFA(fa &dfa);
+bool ContainEpsilon(expr re);

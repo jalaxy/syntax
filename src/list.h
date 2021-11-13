@@ -1,6 +1,6 @@
 /****************************************************************
  * @file list.h
- * @author Name (username@domain.com)
+ * @author Jiang, Xingyu (chinajxy@outlook.com)
  * @brief Template of a list class, constructed by link list
  * @version 0.1
  * @date 2021-09-30
@@ -268,7 +268,7 @@ public:
     T &bottom() const { return head.next == NULL ? *head.p_data : *head.next->p_data; }
 
     /**
-     * @brief 
+     * @brief Clear the list
      * 
      */
     void clear()
@@ -388,8 +388,8 @@ public:
     /**
      * @brief Assignment function
      * 
-     * @param b 
-     * @return list<T>& 
+     * @param b another object
+     * @return reference to this object
      */
     list<T> &operator=(const list<T> &b)
     {
@@ -464,7 +464,7 @@ public:
         llist<T> *p = head.next, *bp = b.head.next;
         while (p != NULL && bp != NULL)
         {
-            if (*p->p_data != *bp->p_data)
+            if (!(*p->p_data == *bp->p_data))
                 return false;
             p = p->next;
             bp = bp->next;
