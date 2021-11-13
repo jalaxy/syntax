@@ -1288,7 +1288,7 @@ bool EBNFToGrammar(list<expr> ebnflist, list<expr> &relist, unsigned int s, gram
  * @param num integer output
  * @return index of position after this number
  */
-int GetInt(wchar_t *str, int wsz, int i, unsigned short &num)
+int GetInt(wchar_t *str, int wsz, int i, unsigned int &num)
 {
     int j = i;
     num = 0;
@@ -1376,7 +1376,7 @@ int ReadEBNFFromString(wchar_t *wbuf, list<expr> &ebnflist, unsigned int &start,
             int k = i;
             while (k < j)
             {
-                unsigned short l, r;
+                unsigned int l, r;
                 l = wbuf[k];
                 if (k + 1 < j && wbuf[k] == L'#' && wbuf[k + 1] == L'x')
                     k = GetInt(wbuf, wsz, k + 2, l);
@@ -1401,7 +1401,7 @@ int ReadEBNFFromString(wchar_t *wbuf, list<expr> &ebnflist, unsigned int &start,
         else if (wbuf[i] == L'#')
             if (i + 1 < wsz && wbuf[i + 1] == L'x')
             {
-                unsigned short num;
+                unsigned int num;
                 int j = GetInt(wbuf, wsz, i + 2, num);
                 sep.append(num);
                 sep.append(num + 1);
@@ -1559,7 +1559,7 @@ int ReadEBNFFromString(wchar_t *wbuf, list<expr> &ebnflist, unsigned int &start,
             case L'#': // unicode characters
                 if (k + 1 < j && wbuf[k + 1] == L'x')
                 {
-                    unsigned short num;
+                    unsigned int num;
                     k = GetInt(wbuf, wsz, k + 2, num);
                     ebnflist[id_rsvd].rhs.append(DetermineTerminal(sep, num) + names.size());
                     hv = h(names[id_rsvd]);
@@ -1583,7 +1583,7 @@ int ReadEBNFFromString(wchar_t *wbuf, list<expr> &ebnflist, unsigned int &start,
                 m = k; // m in [k, l)
                 while (m < l)
                 {
-                    unsigned short left, right;
+                    unsigned int left, right;
                     left = wbuf[m];
                     if (m + 1 < l && wbuf[m] == L'#' && wbuf[m + 1] == L'x')
                         m = GetInt(wbuf, wsz, m + 2, left);

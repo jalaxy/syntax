@@ -79,11 +79,12 @@ int main()
 
     // 这个构造函数是将文法转换为LL(1)预测分析表
     lr1_parsing_table lr1_tb(g);
-    if (lr1_tb.get_row() * lr1_tb.get_col() == 0)
+    if (lr1_tb.get_error_code() != 0)
     {
-        cout << "This is not a LL(1) grammar.\n";
+        cout << "This is not a LR(1) grammar.\n";
         return -1;
     }
+    cout << "Syntax analysis finished. Lexical analysing...\n";
 
     fa dfa, nfa;
     // 这些函数是将正则表达式化简为最小化DFA的, 并转换为状态转移表.
