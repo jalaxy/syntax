@@ -21,15 +21,16 @@
 #define EPSILON ((unsigned int)0xffffffff)  // epsilon symbol
 #define TERMINAL ((unsigned int)0xfffffffe) // terminal symbol
 #define AUGMNTED ((unsigned int)0xfffffffd) // augmented grammar start symbol
-#define OP_KLCLS ((unsigned int)0xfffffffc) // '*'
-#define OP_PTCLS ((unsigned int)0xfffffffb) // '+'
-#define OP_OPTNL ((unsigned int)0xfffffffa) // '?'
-#define OP_CMPLM ((unsigned int)0xfffffff9) // '~'
-#define OP_CNCAT ((unsigned int)0xfffffff8) // '.'
-#define OP_ALTER ((unsigned int)0xfffffff7) // '|'
-#define OP_MINUS ((unsigned int)0xfffffff6) // '-'
-#define OP_RPRTH ((unsigned int)0xfffffff5) // ')'
-#define OP_LPRTH ((unsigned int)0xfffffff4) // '('
+#define REDCTION ((unsigned int)0xfffffffc) // reduction placeholder
+#define OP_KLCLS ((unsigned int)0xfffffffb) // '*'
+#define OP_PTCLS ((unsigned int)0xfffffffa) // '+'
+#define OP_OPTNL ((unsigned int)0xfffffff9) // '?'
+#define OP_CMPLM ((unsigned int)0xfffffff8) // '~'
+#define OP_CNCAT ((unsigned int)0xfffffff7) // '.'
+#define OP_ALTER ((unsigned int)0xfffffff6) // '|'
+#define OP_MINUS ((unsigned int)0xfffffff5) // '-'
+#define OP_RPRTH ((unsigned int)0xfffffff4) // ')'
+#define OP_LPRTH ((unsigned int)0xfffffff3) // '('
 
 struct edge_info
 {

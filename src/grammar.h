@@ -14,9 +14,8 @@
 #include "list.h"
 #include "FA.h"
 
-#define HASH_SZ 1024
+#define HASH_SZ ((unsigned int)1024)
 #define LL1_PARSING_ERROR ((unsigned int)0xffffffff)
-#define LR1_REDUCTION ((unsigned int)0x7ffffffe)
 
 struct prod
 {
@@ -51,23 +50,11 @@ struct hash_string_info
     list<wchar_t> str;
 };
 
-struct lr0_item
-{
-    prod_single pd;
-    int dot;
-};
-
 struct lr1_item
 {
     prod_single pd;
     int dot;
     unsigned int sym;
-};
-
-struct hash_lr0_items_info
-{
-    int idx;
-    lr0_item item;
 };
 
 struct hash_lr1_items_info

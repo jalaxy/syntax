@@ -28,20 +28,6 @@ int h(list<wchar_t> &l)
 /**
  * @brief Hash function
  * 
- * @param i the LR(0) item
- * @return hash value
- */
-int h(lr0_item &i)
-{
-    unsigned int ans = i.pd.variable;
-    for (int j = 0; j < i.pd.expression.size(); j++)
-        ans = (ans * 10 + i.pd.expression[j]) % HASH_SZ;
-    return (ans + i.dot) % HASH_SZ;
-}
-
-/**
- * @brief Hash function
- * 
  * @param l the LR(1) item
  * @return hash value
  */
@@ -129,7 +115,7 @@ void ll1_parsing_table::copy(const ll1_parsing_table &b)
         for (int i = 0; i < row; i++)
             for (int j = 0; j < col; j++)
                 table[i * col + j] = b.table[i * col + j];
-        for (int i = 0; i < HASH_SZ; i++)
+        for (int i = 0; i < (int)HASH_SZ; i++)
             aidx[i] = b.aidx[i];
     }
 }
@@ -405,19 +391,6 @@ bool operator==(const prod &a, const prod &b)
 }
 
 /**
- * @brief Comparison between two LR(0) items
- * 
- * @param a one item
- * @param b another item
- * @return whether two LR(0) items are the same
- */
-bool operator==(const lr0_item &a, const lr0_item &b)
-{
-    return a.pd.variable == b.pd.variable &&
-           a.pd.expression == b.pd.expression && a.dot == b.dot;
-}
-
-/**
  * @brief Comparison between two LR(1) items
  * 
  * @param a one item
@@ -509,7 +482,7 @@ void lr1_parsing_table::copy(const lr1_parsing_table &b)
     memcpy(token, b.token, row * sizeof(unsigned int));
     for (int i = 0; i < reduction_size; i++)
         reductions[i] = b.reductions[i];
-    for (int i = 0; i < HASH_SZ; i++)
+    for (int i = 0; i < (int)HASH_SZ; i++)
         aidx[i] = b.aidx[i];
 }
 
@@ -530,10 +503,9 @@ lr1_parsing_table::lr1_parsing_table(grammar g)
     err_code = 0; // no exception
     g.augment();
     aidx = new (std::nothrow) list<hash_symbol_info>[HASH_SZ];
-    list<hash_lr0_items_info> *aidx_item_0 = new (std::nothrow) list<hash_lr0_items_info>[HASH_SZ];
     list<hash_lr1_items_info> *aidx_item_1 = new (std::nothrow) list<hash_lr1_items_info>[HASH_SZ];
     list<unsigned int> *first = new (std::nothrow) list<unsigned int>[g.productions.size()];
-    if (aidx == NULL || token == NULL || aidx_item_0 == NULL || aidx_item_1 == NULL || first == NULL)
+    if (aidx == NULL || token == NULL || aidx_item_1 == NULL || first == NULL)
     {
 #ifdef HANDLE_MEMORY_EXCEPTION
         HANDLE_MEMORY_EXCEPTION;
@@ -546,7 +518,6 @@ lr1_parsing_table::lr1_parsing_table(grammar g)
     unsigned int id = 0, vp = 0;                             // viable prefix
     list<lr1_item> items;
     list<prod_single> reduclist;
-    list<list<unsigned int>> reducsymbol;
     fa nfa;
     nfa.g.remove_vertex(0);
     nfa.g.add_vertex({id++, NON_ACC});
@@ -554,8 +525,7 @@ lr1_parsing_table::lr1_parsing_table(grammar g)
     aidx_item_1[h(items.top()) % HASH_SZ].append({0, items.top()});
     nfa.s = &nfa.g[0];
     for (int i = 0; i < nfa.g.size(); i++)
-    {
-        if (items[i].dot < items[i].pd.expression.size())
+        if (items[i].sym != REDCTION && items[i].dot < items[i].pd.expression.size())
         {
             unsigned symbol_after_dot = items[i].pd.expression[items[i].dot];
             const hash_symbol_info *p_info = QuerySymbol(aidx, symbol_after_dot);
@@ -624,28 +594,28 @@ lr1_parsing_table::lr1_parsing_table(grammar g)
                     }
                 }
         }
-        else
+        else if (items[i].sym != REDCTION)
         {
+            lr1_item item_reduc = items[i];
+            item_reduc.sym = REDCTION;
+            list<hash_lr1_items_info> &info = aidx_item_1[h(item_reduc) % HASH_SZ];
             int j;
-            lr0_item item_0 = {items[i].pd, items[i].dot};
-            list<hash_lr0_items_info> &info = aidx_item_0[h(item_0)];
             for (j = 0; j < info.size(); j++)
-                if (info[j].item == item_0)
+                if (info[j].item == item_reduc)
                     break;
             if (j == info.size())
             {
-                info.append({(int)vp++, item_0});
-                reduclist.append(item_0.pd);
-                reducsymbol.append(list<unsigned int>());
+                nfa.g.add_vertex({id++, vp++});
+                nfa.f.append(&nfa.g.top());
+                items.append(item_reduc);
+                reduclist.append(item_reduc.pd);
+                info.append({items.size() - 1, item_reduc});
             }
-            nfa.g[i].data.token = (unsigned int)info[j].idx;
-            reducsymbol[info[j].idx].append(items[i].sym);
+            nfa.g.add_edge(i, info[j].idx, {items[i].sym});
         }
-    }
     NFAToDFA(nfa, nfa);
     MinimizeDFA(nfa);
     delete[] first;
-    delete[] aidx_item_0;
     delete[] aidx_item_1;
     reductions = new (std::nothrow) prod_single[reduclist.size()];
     if (reductions == NULL)
@@ -657,15 +627,9 @@ lr1_parsing_table::lr1_parsing_table(grammar g)
     reduction_size = reduclist.size();
     for (int i = 0; i < reduction_size; i++)
         reductions[i] = reduclist[i];
-    nfa.g.add_vertex({id++, LR1_REDUCTION});
-    nfa.f.append(&nfa.g.top());
     row = nfa.g.size();
     table = (int *)malloc(sizeof(int) * row * col);
     token = (unsigned int *)malloc(sizeof(unsigned int) * row);
-    for (int i = 0; i < row - 1; i++)
-        if (nfa.g[i].data.token != NON_ACC)
-            for (int j = 0; j < reducsymbol[nfa.g[i].data.token].size(); j++)
-                nfa.g.add_edge(nfa.g[i], nfa.g.top(), {reducsymbol[nfa.g[i].data.token][j]});
     for (int i = 0; i < row; i++)
         token[i] = nfa.g[i].data.token;
     for (int i = 0; i < row; i++)
@@ -1826,9 +1790,9 @@ bool LR1Parsing(lr1_parsing_table t_lr1, dfa_table t_fa, parsing_tree &tr, const
         int col = p_info->idx + (p_info->regular ? t_lr1.get_terminal_head() : 0);
         if (t_lr1[state][col] == UNDEFINED)
             return false; // error
-        else if (t_lr1.get_token(t_lr1[state][col]) == LR1_REDUCTION)
+        else if (t_lr1.get_token(t_lr1[state][col]) != NON_ACC)
         {
-            const prod_single &pd = t_lr1.get_reduction(t_lr1.get_token(state)); // reduce
+            const prod_single &pd = t_lr1.get_reduction(t_lr1.get_token(t_lr1[state][col])); // reduce
             list<parsing_tree> subtree;
             for (int i = 0; i < pd.expression.size(); i++)
             {
