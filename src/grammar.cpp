@@ -614,6 +614,41 @@ lr1_parsing_table::lr1_parsing_table(grammar g)
             nfa.g.add_edge(i, info[j].idx, {items[i].sym});
         }
     NFAToDFA(nfa, nfa);
+    list<list<unsigned int>> reducsym;
+    list<list<int>> reducidx;
+    for (int i = 0; i < (int)vp; i++)
+    {
+        reducsym.append(list<unsigned int>());
+        reducidx.append(list<int>());
+    }
+    for (int i = 0; i < nfa.g.size(); i++)
+        for (int j = 0; j < nfa.g[i].size(); j++)
+            if (nfa.g[i][j].to->data.token != NON_ACC)
+            {
+                reducsym[nfa.g[i][j].to->data.token].append(nfa.g[i][j].data.value);
+                reducidx[nfa.g[i][j].to->data.token].append(i);
+            }
+    for (int i = 0; i < nfa.g.size(); i++)
+        if (nfa.g[i].data.token != NON_ACC)
+        {
+            reducsym[nfa.g[i].data.token].set_reduce();
+            reducidx[nfa.g[i].data.token].set_reduce();
+        }
+    for (int i = 0; i < nfa.g.size(); i++)
+    {
+        unsigned int rdc = nfa.g[i].data.token;
+        if (rdc != NON_ACC)
+            for (int j = 0; j < reducidx[rdc].size(); j++)
+                for (int k = 0; k < reducsym[rdc].size(); k++)
+                {
+                    int l;
+                    for (l = 0; l < nfa.g[reducidx[rdc][j]].size(); l++)
+                        if (nfa.g[reducidx[rdc][j]][l].data.value == reducsym[rdc][k])
+                            break;
+                    if (l == nfa.g[reducidx[rdc][j]].size())
+                        nfa.g.add_edge(reducidx[rdc][j], i, {reducsym[rdc][k]});
+                }
+    }
     MinimizeDFA(nfa);
     delete[] first;
     delete[] aidx_item_1;
@@ -636,7 +671,7 @@ lr1_parsing_table::lr1_parsing_table(grammar g)
         for (int j = 0; j < col; j++)
             table[i * col + j] = UNDEFINED;
     for (int i = 0; i < row; i++)
-        nfa.g[i].aux = (vertex_t *)i;
+        nfa.g[i].aux = (vertex_t *)(long long)i;
     for (int i = 0; i < row; i++)
     {
         if (nfa.s == &nfa.g[i])
@@ -1787,30 +1822,34 @@ bool LR1Parsing(lr1_parsing_table t_lr1, dfa_table t_fa, parsing_tree &tr, const
     {
         int state = st_state.top();
         const hash_symbol_info *p_info = QuerySymbol(t_lr1.get_index(), st_input.top().symbol);
-        int col = p_info->idx + (p_info->regular ? t_lr1.get_terminal_head() : 0);
-        if (t_lr1[state][col] == UNDEFINED)
-            return false; // error
-        else if (t_lr1.get_token(t_lr1[state][col]) != NON_ACC)
-        {
-            const prod_single &pd = t_lr1.get_reduction(t_lr1.get_token(t_lr1[state][col])); // reduce
-            list<parsing_tree> subtree;
-            for (int i = 0; i < pd.expression.size(); i++)
+        int col = p_info == NULL ? 0 : p_info->idx + (p_info->regular ? t_lr1.get_terminal_head() : 0);
+        if (p_info == NULL || t_lr1[state][col] == UNDEFINED)
+            if (t_lr1.get_token(state) == NON_ACC)
+                return false;
+            else
             {
-                subtree.push_front(st_buffer.top());
+                const prod_single &pd = t_lr1.get_reduction(t_lr1.get_token(state)); // reduce
+                st_input.push_back(st_buffer.top());
                 st_buffer.pop_back();
-            }
-            for (int i = 0; i < pd.expression.size(); i++)
                 st_state.pop_back();
-            st_input.push_back({id_tr++, pd.variable, token_info(), subtree});
-        }
+                list<parsing_tree> subtree;
+                for (int i = 0; i < pd.expression.size(); i++)
+                {
+                    subtree.push_front(st_buffer.top());
+                    st_buffer.pop_back();
+                }
+                for (int i = 0; i < pd.expression.size(); i++)
+                    st_state.pop_back();
+                st_input.push_back({id_tr++, pd.variable, token_info(), subtree});
+            }
         else
         {
+            if (st_input.empty())
+                return false;
             st_buffer.push_back(st_input.top()); // shift
             st_state.push_back(t_lr1[state][col]);
             st_input.pop_back();
         }
-        if (st_input.empty())
-            return false;
     }
     tr = st_input.top();
     return true;

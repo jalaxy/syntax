@@ -75,7 +75,7 @@ int main()
     grammar g;
     // 这个函数是将初步处理的EBNF和RE转化为文法, 最后的bool值表示是否将文法
     // 中可以化为正则表达式的产生式化简为正则表达式
-    EBNFToGrammar(ebnflist, relist, start, g, false);
+    EBNFToGrammar(ebnflist, relist, start, g, true);
 
     // 这个构造函数是将文法转换为LL(1)预测分析表
     lr1_parsing_table lr1_tb(g);
