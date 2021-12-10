@@ -7,7 +7,7 @@
 #include <cstring>
 #endif
 using namespace std;
-void print(parsing_tree &, list<list<wchar_t>> &, FILE *);
+void print(parsing_tree &, list<list<wchar_t>>, FILE *);
 void print(parsing_tree &, list<list<wchar_t>> &);
 void print(list<int>);
 void print(list<unsigned int>, bool = false);
@@ -26,6 +26,7 @@ void print(list<lr1_item>);
 void print(list<list<int>>);
 void print(list<list<unsigned int>>);
 void print(lr1_parsing_table &);
+void print(int);
 
 list<list<wchar_t>> names; // 表达式名称
 
@@ -69,13 +70,20 @@ int main()
     mbstowcs(wbuf, buf, len);
 #endif
     wbuf[wlen] = L'\0';
-    ReadEBNFFromString(wbuf, ebnflist, start, relist, sep, names);
+    int errline = ReadEBNFFromString(wbuf, ebnflist, start, relist, sep, names);
+    if (errline != 0)
+        cout << "error in line " << errline << "." << endl;
     fclose(fp);
 
     grammar g;
     // 这个函数是将初步处理的EBNF和RE转化为文法, 最后的bool值表示是否将文法
     // 中可以化为正则表达式的产生式化简为正则表达式
-    EBNFToGrammar(ebnflist, relist, start, g, true);
+    EBNFToGrammar(ebnflist, relist, start, g, false);
+
+    cout << "EBNF analysis finished.\n";
+    cout << "Grammar size: " << g.productions.size() << endl;
+    cout << "RE list size: " << relist.size() << endl;
+    cout << "Symbol size: " << sep.size() << endl;
 
     // 这个构造函数是将文法转换为LL(1)预测分析表
     lr1_parsing_table lr1_tb(g);
@@ -151,8 +159,12 @@ int main()
     delete[] s;
     return 0;
 }
-void print(parsing_tree &tr, list<list<wchar_t>> &names, FILE *fp)
+void print(parsing_tree &tr, list<list<wchar_t>> names, FILE *fp)
 {
+    for (int i = 0; i < names.size(); i++)
+        for (int j = 0; j < names[i].size(); j++)
+            if (names[i][j] == L'"')
+                names[i][j] = L'\'';
     static unsigned short id = 0xffff;
     fprintf(fp, "%d [label=\"", tr.id);
     if (tr.symbol < (unsigned int)names.size())
@@ -183,6 +195,8 @@ void print(parsing_tree &tr, list<list<wchar_t>> &names, FILE *fp)
             for (int i = 0; i < (int)strlen(str); i++)
                 if (str[i] == '\n' || str[i] == '\r' || str[i] == '\t')
                     fprintf(fp, "#x%X", str[i]);
+                else if (str[i] == '"')
+                    fputc('\'', fp);
                 else
                     fputc(str[i], fp);
             free(str);
@@ -381,10 +395,10 @@ void print(fa &nfa)
     for (int i = 0; i < nfa.g.size(); i++)
     {
         cout << setw(8) << nfa.g[i].data.value << setw(16) << &nfa.g[i];
-        if (nfa.g[i].data.token == NON_ACC)
+        if (nfa.g[i].data.output == NON_ACC)
             cout << setw(8) << " ";
         else
-            cout << setw(8) << nfa.g[i].data.token;
+            cout << setw(8) << nfa.g[i].data.output;
         for (int j = 0; j < nfa.g[i].size(); j++)
         {
             cout << setw(8) << nfa.g[i][j].to->data.value << ":";
@@ -612,3 +626,5 @@ void print(lr1_parsing_table &table)
         cout << endl;
     }
 }
+
+void print(int i) { cout << i << endl; }

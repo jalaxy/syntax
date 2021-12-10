@@ -37,7 +37,8 @@ public:
     graph(const graph &b) { copy(b); }
     const graph &operator=(const graph &b)
     {
-        copy(b);
+        if (&b != this)
+            copy(b);
         return *this;
     }
     graph operator+(const graph &b) const

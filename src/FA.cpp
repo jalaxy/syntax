@@ -13,81 +13,11 @@
 
 unsigned int id = 0;
 
-/**
- * @brief Comparison between two expression object
- * 
- * @param b another object
- * @return whether lhs is less than b.lhs
- */
-bool expr::operator<(const expr &b) const { return lhs < b.lhs; }
-
-/**
- * @brief Alternation operator
- * 
- * @param b another RE
- * @return A | B 
- */
-expr expr::operator|(const expr &b) const
+struct hash_subset_info
 {
-    list<unsigned int> RHS;
-    RHS += OP_LPRTH;
-    RHS += rhs;
-    RHS += OP_RPRTH;
-    RHS += OP_ALTER;
-    RHS += OP_LPRTH;
-    RHS += b.rhs;
-    RHS += OP_RPRTH;
-    return {NON_ACC, RHS};
-}
-
-/**
- * @brief Concatenation operator
- * 
- * @param b another RE
- * @return A B
- */
-expr expr::operator<<(const expr &b) const
-{
-    list<unsigned int> RHS;
-    RHS += OP_LPRTH;
-    RHS += rhs;
-    RHS += OP_RPRTH;
-    RHS += OP_CNCAT;
-    RHS += OP_LPRTH;
-    RHS += b.rhs;
-    RHS += OP_RPRTH;
-    return {NON_ACC, RHS};
-}
-
-/**
- * @brief Kleene Closure operation
- * 
- * @return A*
- */
-expr expr::operator*() const
-{
-    list<unsigned int> RHS;
-    RHS += OP_LPRTH;
-    RHS += rhs;
-    RHS += OP_RPRTH;
-    RHS += OP_KLCLS;
-    return {NON_ACC, RHS};
-}
-
-/**
- * @brief Complementation
- * 
- * @return ~A
- */
-expr expr::operator~() const
-{
-    list<unsigned int> RHS;
-    RHS += OP_CMPLM;
-    RHS += OP_LPRTH;
-    RHS += rhs;
-    RHS += OP_RPRTH;
-    return {NON_ACC, RHS};
-}
+    int idx;
+    list<vertex_t *> subset;
+};
 
 /**
  * @brief Copy an fa object from another object
@@ -128,358 +58,11 @@ fa::fa(const fa &b) { copy(b); }
  * @param b 
  * @return const fa& 
  */
-const fa &fa::operator=(const fa &b)
+fa &fa::operator=(const fa &b)
 {
-    copy(b);
+    if (&b != this)
+        copy(b);
     return *this;
-}
-
-/**
- * @brief Copy from another object
- * 
- * @param b the other object
- */
-void dfa_table::copy(const dfa_table &b)
-{
-    row = b.row;
-    col = b.col;
-    s = b.s;
-    if (row * col == 0)
-    {
-        table = NULL;
-        sep = token = NULL;
-        f = NULL;
-    }
-    else
-    {
-        table = (int *)malloc(sizeof(int) * row * col);
-        sep = (unsigned int *)malloc(sizeof(unsigned int) * col);
-        token = (unsigned int *)malloc(sizeof(unsigned int) * row);
-        f = (bool *)malloc(sizeof(bool) * row);
-        if (table == NULL || sep == NULL || token == NULL || f == NULL)
-        {
-#ifdef HANDLE_MEMORY_EXCEPTION
-            HANDLE_MEMORY_EXCEPTION;
-#endif
-        }
-        memcpy(table, b.table, sizeof(int) * row * col);
-        memcpy(sep, b.sep, sizeof(unsigned int) * col);
-        memcpy(token, b.token, sizeof(unsigned int) * row);
-        memcpy(f, b.f, sizeof(bool) * row);
-    }
-}
-
-/**
- * @brief Construct a new DFA table
- * 
- * @param b the other object
- */
-dfa_table::dfa_table(const dfa_table &b) { copy(b); }
-
-/**
- * @brief Construct a new DFA table from a DFA
- * 
- * @param dfa the DFA
- * @param lsep the list of separation values
- */
-dfa_table::dfa_table(fa dfa, list<unsigned int> lsep)
-{
-    row = dfa.g.size();
-    col = dfa.sigma_range;
-    if (lsep.size() == 0)
-        for (int i = 1; i < col; i++)
-            lsep.append(i);
-    if (lsep.size() != col - 1)
-    {
-        table = NULL;
-        sep = token = NULL;
-        f = NULL;
-        row = 1;
-        col = 0;
-        return;
-    }
-    table = (int *)malloc(sizeof(int) * row * col);
-    sep = (unsigned int *)malloc(sizeof(unsigned int) * col);
-    token = (unsigned int *)malloc(sizeof(unsigned int) * row);
-    f = (bool *)malloc(sizeof(bool) * row);
-    if (table == NULL || sep == NULL || token == NULL || f == NULL)
-    {
-#ifdef HANDLE_MEMORY_EXCEPTION
-        HANDLE_MEMORY_EXCEPTION;
-#endif
-    }
-    for (int i = 0; i < row; i++)
-    {
-        for (int j = 0; j < col; j++)
-            table[i * col + j] = UNDEFINED;
-        dfa.g[i].aux = (vertex_t *)(long long)i;
-    }
-    s = (unsigned int)(long long)dfa.s->aux;
-    for (int i = 0; i < row; i++)
-        for (int j = 0; j < dfa.g[i].size(); j++)
-        {
-            unsigned int symbol = dfa.g[i][j].data.value;
-            if (symbol < dfa.sigma_range && table[i * col + symbol] == UNDEFINED)
-                table[i * col + symbol] = (int)(long long)dfa.g[i][j].to->aux;
-            else
-            {
-                free(table);
-                free(sep);
-                free(token);
-                free(f);
-                table = NULL;
-                sep = token = NULL;
-                f = NULL;
-                row = 1;
-                col = 0;
-                return;
-            }
-        }
-    for (int i = 0; i < dfa.g.size(); i++)
-        dfa.g[i].aux = (vertex_t *)0;
-    for (int i = 0; i < dfa.f.size(); i++)
-        dfa.f[i]->aux = (vertex_t *)1;
-    for (int i = 0; i < row; i++)
-        f[i] = dfa.g[i].aux == (vertex_t *)1;
-    if (col > 0)
-    {
-        for (int i = 0; i < col - 1; i++)
-            sep[i] = lsep[i];
-        sep[col - 1] = 0x110000;
-    }
-    for (int i = 0; i < dfa.g.size(); i++)
-        token[i] = dfa.g[i].data.token;
-}
-
-/**
- * @brief Destroy the DFA table object
- * 
- */
-dfa_table::~dfa_table()
-{
-    if (table != NULL)
-        free(table);
-    if (f != NULL)
-        free(f);
-    if (sep != NULL)
-        free(sep);
-    if (token != NULL)
-        free(token);
-}
-
-/**
- * @brief Assignment function
- * 
- * @param b 
- * @return dfa_table& 
- */
-dfa_table &dfa_table::operator=(const dfa_table &b)
-{
-    if (table != NULL)
-        free(table);
-    if (f != NULL)
-        free(f);
-    copy(b);
-    return *this;
-}
-
-/**
- * @brief Operator []
- * 
- * @param idx the index
- * @return the first address of idx-th row
- */
-int *dfa_table::operator[](int idx) { return &table[idx * col]; }
-
-/**
- * @brief Get the number of rows
- * 
- * @return the number of rows
- */
-int dfa_table::get_row() { return row; }
-
-/**
- * @brief Get the number of columns
- * 
- * @return the number of columns
- */
-int dfa_table::get_col() { return col; }
-
-/**
- * @brief Get the initial state
- * 
- * @return the initial state
- */
-int dfa_table::get_start() { return s; }
-
-/**
- * @brief Get the token of i-th state
- * 
- * @param idx the index
- * @return the token
- */
-unsigned int dfa_table::get_token(int idx) { return token[idx]; }
-
-/**
- * @brief Get the final state
- * 
- * @param idx the index to query
- * @return whether i-th state is acceptable
- */
-bool dfa_table::is_acceptable(int idx) { return f[idx]; }
-
-/**
- * @brief Get next state according to separation
- * 
- * @param state current state
- * @param ch unicode character, from 0 to 0x10FFFF
- * @return next state
- */
-int dfa_table::next(int state, unsigned int ch)
-{
-    if (state > row || ch > 0x110000)
-        return UNDEFINED;
-    unsigned int symbol = 0;
-    if (ch >= sep[0])
-    {
-        int l = 0, r = col;
-        while (l + 1 < r)
-        {
-            int mid = (l + r) / 2;
-            if (sep[mid] <= ch)
-                l = mid;
-            else
-                r = mid;
-        }
-        symbol = l + 1;
-    }
-    return table[state * col + symbol];
-}
-
-/**
- * @brief Convert a string into token stream and lexemes
- * 
- * @param str a string
- * @param tokens the output tokens
- * @return whether it is successful
- */
-bool dfa_table::token_stream(const wchar_t *str, list<token_info> &tokens)
-{
-    tokens = list<token_info>();
-    const wchar_t *p = str;
-    while (*p != L'\0')
-    {
-        const wchar_t *q = p, *base = p;
-        int state = s;
-        int acceptable_state = UNDEFINED;
-        while (*q != L'\0')
-        {
-            int next_state = next(state, *q++);
-            if (next_state == UNDEFINED)
-                break;
-            else if (f[state = next_state])
-            {
-                acceptable_state = state;
-                p = q;
-            }
-        }
-        if (acceptable_state == UNDEFINED)
-            return false;
-        tokens.append(token_info(token[acceptable_state], base, p - base));
-    }
-    return true;
-}
-
-/**
- * @brief Construct a new token info object from another object
- * 
- * @param b another object 
- */
-token_info::token_info(const token_info &b)
-{
-    token = b.token;
-    int sz = 0;
-    if ((lexeme = b.lexeme) == NULL)
-        return;
-    while (b.lexeme[sz++] != L'\0')
-        ;
-    lexeme = (wchar_t *)malloc(sizeof(wchar_t) * sz);
-    if (lexeme == NULL)
-    {
-#ifdef HANDLE_MEMORY_EXCEPTION
-        HANDLE_MEMORY_EXCEPTION;
-#endif
-    }
-    memcpy(lexeme, b.lexeme, sz * sizeof(wchar_t));
-}
-
-/**
- * @brief Construct a new token info object from assignment
- * 
- * @param TOKEN the token to copy
- * @param LEXEME the lexeme string to copy
- * @param len the length of lexeme
- */
-token_info::token_info(unsigned int TOKEN, const wchar_t *LEXEME, int len)
-{
-    token = TOKEN;
-    if (LEXEME == NULL)
-    {
-        lexeme = NULL;
-        return;
-    }
-    if (len < 0)
-    {
-        len = 0;
-        while (LEXEME[len] != L'\0')
-            len++;
-    }
-    lexeme = (wchar_t *)malloc(sizeof(wchar_t) * (len + 1));
-    if (lexeme == NULL)
-    {
-#ifdef HANDLE_MEMORY_EXCEPTION
-        HANDLE_MEMORY_EXCEPTION;
-#endif
-    }
-    memcpy(lexeme, LEXEME, len * sizeof(wchar_t));
-    lexeme[len] = L'\0';
-}
-
-/**
- * @brief Assignment function
- * 
- * @param b another object
- * @return reference to this object
- */
-token_info &token_info::operator=(const token_info &b)
-{
-    if (lexeme != NULL)
-        free(lexeme);
-    token = b.token;
-    int sz = 0;
-    if ((lexeme = b.lexeme) == NULL)
-        return *this;
-    while (b.lexeme[sz++] != L'\0')
-        ;
-    lexeme = (wchar_t *)malloc(sizeof(wchar_t) * sz);
-    if (lexeme == NULL)
-    {
-#ifdef HANDLE_MEMORY_EXCEPTION
-        HANDLE_MEMORY_EXCEPTION;
-#endif
-    }
-    memcpy(lexeme, b.lexeme, sz * sizeof(wchar_t));
-    return *this;
-}
-
-/**
- * @brief Destroy the token info object
- * 
- */
-token_info::~token_info()
-{
-    if (lexeme != NULL)
-        free(lexeme);
 }
 
 /**
@@ -518,7 +101,10 @@ bool operator<(const edge_info &a, const edge_info &b) { return a.value < b.valu
  */
 fa &fa::operator|=(fa &b)
 {
-    g.merge(b.g);
+    if (&b == this)
+        g = g + g;
+    else
+        g.merge(b.g);
     g.add_vertex({id++, NON_ACC});
     g.add_edge(g.top(), *s, {EPSILON});
     g.add_edge(g.top(), *b.s, {EPSILON});
@@ -537,7 +123,10 @@ fa &fa::operator|=(fa &b)
  */
 fa &fa::operator<<=(fa &b)
 {
-    g.merge(b.g);
+    if (&b == this)
+        g = g + g;
+    else
+        g.merge(b.g);
     for (int i = 0; i < f.size(); i++)
         g.add_edge(*f[i], *b.s, {EPSILON});
     f = list<vertex_t *>();
@@ -688,7 +277,10 @@ bool REToNFA(list<expr> relist, fa &nfa, unsigned int symbol_range)
                     MinimizeDFA(fa_stack.top());
                 }
                 if (ch == OP_RPRTH)
-                    op_stack.pop_back();
+                    if (op_stack.empty() || op_stack.top() != OP_LPRTH)
+                        return false;
+                    else
+                        op_stack.pop_back();
                 else
                     op_stack.push_back(ch);
                 break;
@@ -697,8 +289,10 @@ bool REToNFA(list<expr> relist, fa &nfa, unsigned int symbol_range)
                 break;
             }
         }
+        if (!op_stack.empty())
+            return false;
         for (int j = 0; j < fa_stack.top().f.size(); j++)
-            fa_stack.top().f[j]->data.token = relist[i].lhs;
+            fa_stack.top().f[j]->data.output = relist[i].lhs;
         if (nfa.f.empty())
             nfa = fa_stack.top();
         else
@@ -707,71 +301,6 @@ bool REToNFA(list<expr> relist, fa &nfa, unsigned int symbol_range)
     }
     NormalizeID(nfa);
     return true;
-}
-
-/**
- * @brief Determine whether epsilon is in an RE
- * 
- * @param re the regular expression
- * @return whether it contains epsilon
- */
-bool ContainEpsilon(expr re)
-{
-    re.rhs.append(OP_RPRTH);
-    list<bool> tr_stack; // truth value stack
-    list<unsigned int> op_stack;
-    op_stack.push_back(OP_LPRTH);
-    int type = 0; // the next character type (operand: 0; operator: 1)
-    for (int j = 0; j < re.rhs.size(); j++)
-    {
-        unsigned int ch = re.rhs[j];
-        if ((ch == OP_RPRTH || ch == OP_KLCLS || ch == OP_CNCAT || ch == OP_ALTER ? 1 : 0) != type)
-            return false;
-        type = ch == OP_LPRTH || ch == OP_CNCAT || ch == OP_ALTER || ch == OP_CMPLM ? 0 : 1;
-        switch (ch)
-        {
-        case OP_LPRTH:
-            op_stack.push_back(OP_LPRTH);
-            break;
-        case OP_RPRTH:
-        case OP_KLCLS:
-        case OP_CMPLM:
-        case OP_CNCAT:
-        case OP_ALTER:
-            while (ch < op_stack.top() ||
-                   (ch == op_stack.top() && ch != OP_CMPLM))
-            {
-                switch (op_stack.top())
-                {
-                case OP_KLCLS:
-                    tr_stack.top() = true;
-                    break;
-                case OP_CMPLM:
-                    tr_stack.top() = !tr_stack.top();
-                    break;
-                case OP_CNCAT:
-                    tr_stack.undertop() &= tr_stack.top();
-                    tr_stack.pop_back();
-                    break;
-                case OP_ALTER:
-                    tr_stack.undertop() |= tr_stack.top();
-                    tr_stack.pop_back();
-                    break;
-                }
-                op_stack.pop_back();
-            }
-            if (ch == OP_RPRTH)
-                op_stack.pop_back();
-            else
-                op_stack.push_back(ch);
-            break;
-        default:
-            tr_stack.push_back(ch == EPSILON);
-            break;
-        }
-    }
-    re.rhs.pop_back();
-    return tr_stack.top();
 }
 
 /**
@@ -840,14 +369,14 @@ void EliminateRings(fa &nfa)
                 nfa.g[i].aux = (vertex_t *)-1;
             for (int i = 0; i < nfa.f.size(); i++)
                 nfa.f[i]->aux = (vertex_t *)(long long)i; // i is the index of nfa.f
-            nfa.g.top().data.token = NON_ACC;
+            nfa.g.top().data.output = NON_ACC;
             bool tmnl = false;
             for (int i = 0; i < st.size(); i++)
             {
                 if (st[i]->aux != (vertex_t *)-1) // it is a terminal
                 {
-                    if (st[i]->data.token < nfa.g.top().data.token)
-                        nfa.g.top().data.token = st[i]->data.token;
+                    if (st[i]->data.output < nfa.g.top().data.output)
+                        nfa.g.top().data.output = st[i]->data.output;
                     nfa.f.remove((long long)st[i]->aux);
                     tmnl = true;
                 }
@@ -1038,11 +567,11 @@ void NFAToDFA(fa nfa, fa &dfa)
     {
         vertex_t &v = dfa.g[i];
         list<vertex_t *> &subset = *(list<vertex_t *> *)dfa.g[i].aux;
-        v.data.token = NON_ACC;
+        v.data.output = NON_ACC;
         for (int j = 0; j < subset.size(); j++)
         {
-            if (subset[j]->data.token < v.data.token)
-                v.data.token = subset[j]->data.token;
+            if (subset[j]->data.output < v.data.output)
+                v.data.output = subset[j]->data.output;
             if (subset[j]->aux == (vertex_t *)1 && dfa.f.top() != &dfa.g[i])
                 dfa.f.append(&dfa.g[i]);
         }
@@ -1098,7 +627,7 @@ void MinimizeDFA(fa &dfa)
         {
             next.append(list<int>());
             next[i].append(group[i]);
-            next[i].append(dfa.g[i].data.token);
+            next[i].append(dfa.g[i].data.output);
         }
         for (int i = 0; i < symbols.size(); i++) // the i-th symbol
         {

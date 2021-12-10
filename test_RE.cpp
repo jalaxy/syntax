@@ -67,10 +67,10 @@ void print(fa nfa)
     for (int i = 0; i < nfa.g.size(); i++)
     {
         cout << "\t" << nfa.g[i].data.value << "\t" << &nfa.g[i];
-        if (nfa.g[i].data.token == NON_ACC)
+        if (nfa.g[i].data.output == NON_ACC)
             cout << "\t";
         else
-            cout << "\t" << nfa.g[i].data.token;
+            cout << "\t" << nfa.g[i].data.output;
         for (int j = 0; j < nfa.g[i].size(); j++)
         {
             cout << "\t" << nfa.g[i][j].to->data.value;
@@ -137,8 +137,8 @@ int main()
         fa nfa;
         clock_t t_s = clock();
         bool valid = REToNFA(relist, nfa);
-        cout << "Size: " << relist.size() << endl;
-        cout << "Expression: " << s << endl;
+        // cout << "Size: " << relist.size() << endl;
+        // cout << "Expression: " << s << endl;
         cout << "Elapsed time is " << clock() - t_s << " ms\n";
         cout << (valid ? "true" : "false") << endl;
         print(nfa);
