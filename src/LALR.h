@@ -35,12 +35,13 @@ struct parsing_tree
 class lr1_parsing_table
 {
 private:
-    int row, col;
+    int row, col, col_var;
     int *table;
     unsigned int *output; // output on each state, index of reduc_var and reduc_expr
     int reduc_size;
     unsigned int *reduc_var;        // reduction variable i.e. variable (LHS)
     list<unsigned int> *reduc_expr; // reduction expression i.e. rule string (RHS)
+    int *reduc_idx;                 // reduction index, for calling functions
     list<hash_symbol_info> *aidx;   // hash table
     int s;
     void copy(const lr1_parsing_table &b);
@@ -49,7 +50,11 @@ private:
 public:
     lr1_parsing_table(const lr1_parsing_table &b);
     lr1_parsing_table(grammar g);
+    lr1_parsing_table(const void *p);
     ~lr1_parsing_table();
     const lr1_parsing_table &operator=(const lr1_parsing_table &b);
-    bool parse(list<token_info> tk, parsing_tree &tr);
+    int store(void *p = NULL);
+    bool postfixtrans(list<token_info> tk,
+                      const void *(*f_list[])(const void **),
+                      const void *(*ft_list[])(const token_info &));
 };

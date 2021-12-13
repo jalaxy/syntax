@@ -34,19 +34,15 @@ private:
     int row, col, s;
     bool *f, *ignore;
     void copy(const transition_table &b);
+    int next(int state, unsigned int ch);
 
 public:
     transition_table(const transition_table &b);
     transition_table(fa dfa, list<unsigned int> lsep = list<unsigned int>(),
                      list<unsigned int> types = list<unsigned int>());
+    transition_table(const void *p);
     ~transition_table();
     transition_table &operator=(const transition_table &b);
-    int *operator[](int idx);
-    int get_row();
-    int get_col();
-    int get_start();
-    unsigned int get_token(int idx);
-    bool is_acceptable(int idx);
-    int next(int state, unsigned int ch);
     bool token_stream(const wchar_t *str, list<token_info> &tokens);
+    int store(void *p = NULL);
 };

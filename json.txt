@@ -1,22 +1,24 @@
-json        ::= element
-value       ::= object | array | string | number | "true" | "false" | "null"
-object      ::= '{' ws '}' | '{' members '}'
-members     ::= member | member ',' members
-member      ::= ws string ws ':' element
-array       ::= '[' ws ']' | '[' elements ']'
-elements    ::= element | element ',' elements
-element     ::= ws value ws
-string      ::= '"' character* '"'
-characters  ::= "" | character characters
-character   ::= [#x0020-#x10FFFF] - '"' - '\' | '\' escape
-escape      ::= '"' | '\' | '/' | 'b' | 'f' | 'n' | 'r' | 't' | 'u' hex hex hex hex
-hex         ::= digit | [A-Fa-f]
-number      ::= integer fraction exponent
-integer     ::= digit | onenine digits | '-' digit | '-' onenine digits
-digits      ::= digit | digit digits
-digit       ::= '0' | onenine
-onenine     ::= [1-9]
-fraction    ::= "" | '.' digits
-exponent    ::= "" | 'E' sign digits | 'e' sign digits
-sign        ::= "" | '+' | '-'
-ws          ::= [#x20#xA#xD#x9]*
+variable:
+    json        ::= element
+    element     ::= value
+    value       ::= object | array | string | number | "true" | "false" | "null"
+    object      ::= '{' '}' | '{' members '}'
+    members     ::= member | member ',' members
+    member      ::= string ':' element
+    array       ::= '[' ']' | '[' elements ']'
+    elements    ::= element | element ',' elements
+    number      ::= integer fraction exponent
+    integer     ::= digit | onenine digits | '-' digit | '-' onenine digits
+    fraction    ::= ('.' digits)?
+    exponent    ::= ('E' sign digits | 'e' sign digits)?
+    sign        ::= ('+' | '-')?
+terminal:
+    string      ::= '"' characters '"'
+    characters  ::= (([#x0020-#x10FFFF] - '"' - '\') | '\' escape)*
+    escape      ::= '"' | '\' | '/' | 'b' | 'f' | 'n' | 'r' | 't' | 'u' hex hex hex hex
+    hex         ::= digit | [A-Fa-f]
+    digit       ::= '0' | onenine
+    onenine     ::= [1-9]
+    digits      ::= digit+
+ignore:
+    ws          ::= [#x20#xA#xD#x9]*

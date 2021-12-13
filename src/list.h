@@ -42,6 +42,7 @@ private:
 #ifdef HANDLE_MEMORY_EXCEPTION
             HANDLE_MEMORY_EXCEPTION;
 #endif
+            return;
         }
         *(int *)head.p_data = 0;
         head.next = head.pre = NULL;
@@ -117,6 +118,7 @@ private:
 #ifdef HANDLE_MEMORY_EXCEPTION
             HANDLE_MEMORY_EXCEPTION;
 #endif
+            return;
         }
         p->p_data = new (std::nothrow) T(x);
         if (p->p_data == NULL)
@@ -124,6 +126,7 @@ private:
 #ifdef HANDLE_MEMORY_EXCEPTION
             HANDLE_MEMORY_EXCEPTION;
 #endif
+            return;
         }
         p->pre = pos;
         p->next = pos->next;
@@ -265,7 +268,12 @@ public:
      */
     T &undertop() const { return p_rear->pre == NULL ? *head.p_data : *p_rear->pre->p_data; }
 
-    T &bottom() const { return head.next == NULL ? *head.p_data : *head.next->p_data; }
+    /**
+     * @brief The first element
+     * 
+     * @return T& 
+     */
+    T &front() const { return head.next == NULL ? *head.p_data : *head.next->p_data; }
 
     /**
      * @brief Clear the list

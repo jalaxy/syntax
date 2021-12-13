@@ -18,6 +18,13 @@ struct hash_lr1_items_info
     lr1_item item;
 };
 
+struct hash_prod_info
+{
+    int idx;
+    unsigned int variable;
+    list<unsigned int> expr;
+};
+
 /**
  * @brief Comparison between two LR(1) items
  * 
@@ -35,7 +42,7 @@ bool operator==(const lr1_item &a, const lr1_item &b)
 /**
  * @brief Hash function
  * 
- * @param l the LR(1) item
+ * @param i the LR(1) item
  * @return hash value
  */
 int h(lr1_item &i)
@@ -47,6 +54,21 @@ int h(lr1_item &i)
 }
 
 /**
+ * @brief Hash function
+ * 
+ * @param v production variable
+ * @param e expression
+ * @return hash value
+ */
+int h(unsigned int v, list<unsigned int> &e)
+{
+    unsigned int ans = v;
+    for (int j = 0; j < e.size(); j++)
+        ans = (ans * 10 + e[j]) % HASH_SZ;
+    return ans;
+}
+
+/**
  * @brief The calculation of hash table
  * 
  * @param g the grammar
@@ -54,7 +76,7 @@ int h(lr1_item &i)
  * @param prod_sz production size, the index of first terminal
  * @return the number of regular language, which is not appearing in LHS
  */
-int CalcHash(grammar &g, list<hash_symbol_info> *aidx, int prod_sz)
+int CalcHash(grammar &g, list<hash_symbol_info> *aidx)
 {
     int col = 0;
     for (int i = 0; i < g.productions.size(); i++)
@@ -67,8 +89,8 @@ int CalcHash(grammar &g, list<hash_symbol_info> *aidx, int prod_sz)
                     re_sym.append(g.productions[i].expression[j][k]);
     re_sym.set_reduce();
     for (int i = 0; i < re_sym.size(); i++)
-        aidx[re_sym[i] % HASH_SZ].append({true, (col++) + prod_sz, re_sym[i]});
-    aidx[ENDMARK % HASH_SZ].append({true, col++, ENDMARK});
+        aidx[re_sym[i] % HASH_SZ].append({true, (col++) + g.productions.size(), re_sym[i]});
+    aidx[ENDMARK % HASH_SZ].append({true, (col++) + g.productions.size(), ENDMARK});
     return col;
 }
 
@@ -90,6 +112,7 @@ list<unsigned int> lr1_parsing_table::calc_first(grammar &g, unsigned int variab
 #ifdef HANDLE_MEMORY_EXCEPTION
             HANDLE_MEMORY_EXCEPTION;
 #endif
+            return list<unsigned int>();
         }
         memset(v, 0, sizeof(bool) * g.productions.size());
     }
@@ -131,23 +154,29 @@ void lr1_parsing_table::copy(const lr1_parsing_table &b)
     s = b.s;
     row = b.row;
     col = b.col;
+    col_var = b.col_var;
     reduc_size = b.reduc_size;
     table = (int *)malloc(sizeof(int) * row * col);
     output = (unsigned int *)malloc(sizeof(unsigned int) * row);
     reduc_var = (unsigned int *)malloc(sizeof(unsigned int) * reduc_size);
     reduc_expr = new (std::nothrow) list<unsigned int>[reduc_size];
+    reduc_idx = (int *)malloc(sizeof(int) * reduc_size);
     aidx = new (std::nothrow) list<hash_symbol_info>[HASH_SZ];
-    if (table == NULL || reduc_var == NULL || reduc_expr == NULL || aidx == NULL || output == NULL)
+    if (table == NULL || reduc_var == NULL || reduc_idx == NULL ||
+        reduc_expr == NULL || aidx == NULL || output == NULL)
     {
 #ifdef HANDLE_MEMORY_EXCEPTION
         HANDLE_MEMORY_EXCEPTION;
 #endif
+        row = col = col_var = 0;
+        return;
     }
     memcpy(table, b.table, row * col * sizeof(int));
     memcpy(output, b.output, row * sizeof(unsigned int));
     for (int i = 0; i < reduc_size; i++)
     {
         reduc_var[i] = b.reduc_var[i];
+        reduc_idx[i] = b.reduc_idx[i];
         reduc_expr[i] = b.reduc_expr[i];
     }
     for (int i = 0; i < (int)HASH_SZ; i++)
@@ -168,18 +197,25 @@ lr1_parsing_table::lr1_parsing_table(const lr1_parsing_table &b) { copy(b); }
  */
 lr1_parsing_table::lr1_parsing_table(grammar g)
 {
+    table = NULL;
+    reduc_var = output = NULL;
+    reduc_expr = NULL;
+    reduc_idx = NULL;
+    aidx = NULL;
     g.augment();
     aidx = new (std::nothrow) list<hash_symbol_info>[HASH_SZ];
     list<hash_lr1_items_info> *aidx_item_1 = new (std::nothrow) list<hash_lr1_items_info>[HASH_SZ];
     list<unsigned int> *first = new (std::nothrow) list<unsigned int>[g.productions.size()];
-    if (aidx == NULL || output == NULL || aidx_item_1 == NULL || first == NULL)
+    if (aidx == NULL || aidx_item_1 == NULL || first == NULL)
     {
 #ifdef HANDLE_MEMORY_EXCEPTION
         HANDLE_MEMORY_EXCEPTION;
 #endif
+        row = col = col_var = 0;
+        return;
     }
     // symbols: 0 ~ variables - 1, variables ~ variables + terminals - 1
-    col = g.productions.size() + CalcHash(g, aidx, g.productions.size());
+    col = (col_var = g.productions.size()) + CalcHash(g, aidx);
     for (int i = 0; i < g.productions.size(); i++)
         first[i] = calc_first(g, g.productions[i].variable); // can be optimized
     unsigned int id = 0, vp = 0;                             // viable prefix
@@ -188,7 +224,7 @@ lr1_parsing_table::lr1_parsing_table(grammar g)
     list<list<unsigned int>> reduc_expr_list;
     fa nfa;
     nfa.g.remove_vertex(0);
-    nfa.g.add_vertex({id++, NON_ACC});
+    nfa.g.add_vertex({id++, list<unsigned int>()});
     items.append({g.s->variable, g.s->expression.top(), 0, ENDMARK}); // S' -> .S, $
     aidx_item_1[h(items.top()) % HASH_SZ].append({0, items.top()});
     nfa.s = &nfa.g[0];
@@ -206,7 +242,7 @@ lr1_parsing_table::lr1_parsing_table(grammar g)
                     break;
             if (j == info.size()) // not found
             {
-                nfa.g.add_vertex({id++, NON_ACC});
+                nfa.g.add_vertex({id++, list<unsigned int>()});
                 nfa.g.add_edge(nfa.g[i], nfa.g.top(), {symbol_after_dot});
                 items.append(item_shift);
                 info.append({items.size() - 1, item_shift});
@@ -251,7 +287,7 @@ lr1_parsing_table::lr1_parsing_table(grammar g)
                                 break;
                         if (l == info.size())
                         {
-                            nfa.g.add_vertex({id++, NON_ACC});
+                            nfa.g.add_vertex({id++, list<unsigned int>()});
                             nfa.g.add_edge(nfa.g[i], nfa.g.top(), {EPSILON});
                             items.append(item_closure);
                             info.append({items.size() - 1, item_closure});
@@ -272,7 +308,8 @@ lr1_parsing_table::lr1_parsing_table(grammar g)
                     break;
             if (j == info.size())
             {
-                nfa.g.add_vertex({id++, vp++});
+                nfa.g.add_vertex({id++, list<unsigned int>()});
+                nfa.g.top().data.output.append(vp++);
                 nfa.f.append(&nfa.g.top());
                 items.append(item_reduc);
                 reduc_var_list.append(item_reduc.variable);
@@ -282,8 +319,6 @@ lr1_parsing_table::lr1_parsing_table(grammar g)
             nfa.g.add_edge(i, info[j].idx, {items[i].sym});
         }
     NFAToDFA(nfa, nfa);
-    void print(fa);
-    print(nfa);
     list<list<unsigned int>> reducsym;
     list<list<int>> reducidx;
     for (int i = 0; i < (int)vp; i++)
@@ -293,20 +328,20 @@ lr1_parsing_table::lr1_parsing_table(grammar g)
     }
     for (int i = 0; i < nfa.g.size(); i++)
         for (int j = 0; j < nfa.g[i].size(); j++)
-            if (nfa.g[i][j].to->data.output != NON_ACC)
+            if (!nfa.g[i][j].to->data.output.empty())
             {
-                reducsym[nfa.g[i][j].to->data.output].append(nfa.g[i][j].data.value);
-                reducidx[nfa.g[i][j].to->data.output].append(i);
+                reducsym[nfa.g[i][j].to->data.output.front()].append(nfa.g[i][j].data.value);
+                reducidx[nfa.g[i][j].to->data.output.front()].append(i);
             }
     for (int i = 0; i < nfa.g.size(); i++)
-        if (nfa.g[i].data.output != NON_ACC)
+        if (nfa.g[i].data.output.front() != NON_ACC)
         {
-            reducsym[nfa.g[i].data.output].set_reduce();
-            reducidx[nfa.g[i].data.output].set_reduce();
+            reducsym[nfa.g[i].data.output.front()].set_reduce();
+            reducidx[nfa.g[i].data.output.front()].set_reduce();
         }
     for (int i = 0; i < nfa.g.size(); i++)
     {
-        unsigned int rdc = nfa.g[i].data.output;
+        unsigned int rdc = nfa.g[i].data.output.front();
         if (rdc != NON_ACC)
             for (int j = 0; j < reducidx[rdc].size(); j++)
                 for (int k = 0; k < reducsym[rdc].size(); k++)
@@ -324,23 +359,48 @@ lr1_parsing_table::lr1_parsing_table(grammar g)
     delete[] aidx_item_1;
     reduc_var = (unsigned int *)malloc(sizeof(unsigned int) * reduc_var_list.size());
     reduc_expr = new (std::nothrow) list<unsigned int>[reduc_expr_list.size()];
-    if (reduc_var == NULL || reduc_expr == NULL)
+    reduc_idx = (int *)malloc(sizeof(int) * reduc_var_list.size());
+    list<hash_prod_info> *aidx_prod = new (std::nothrow) list<hash_prod_info>[HASH_SZ];
+    if (reduc_var == NULL || reduc_expr == NULL | reduc_idx == NULL || aidx_prod == NULL)
     {
 #ifdef HANDLE_MEMORY_EXCEPTION
         HANDLE_MEMORY_EXCEPTION;
 #endif
+        row = col = col_var = 0;
+        return;
     }
     reduc_size = reduc_var_list.size();
+    int prod_idx = 0;
+    for (int i = 0; i < g.productions.size(); i++)
+        for (int j = 0; j < g.productions[i].expression.size(); j++)
+            aidx_prod[h(g.productions[i].variable, g.productions[i].expression[j]) % HASH_SZ]
+                .append({prod_idx++, g.productions[i].variable, g.productions[i].expression[j]});
     for (int i = 0; i < reduc_size; i++)
     {
         reduc_var[i] = reduc_var_list[i];
         reduc_expr[i] = reduc_expr_list[i];
+        list<hash_prod_info> &info = aidx_prod[h(reduc_var[i], reduc_expr[i]) % HASH_SZ];
+        for (int j = 0; j < info.size(); j++)
+            if (info[j].variable == reduc_var[i] && info[j].expr == reduc_expr[i])
+            {
+                reduc_idx[i] = info[j].idx;
+                break;
+            }
     }
+    delete[] aidx_prod;
     row = nfa.g.size();
     table = (int *)malloc(sizeof(int) * row * col);
     output = (unsigned int *)malloc(sizeof(unsigned int) * row);
+    if (table == NULL || output == NULL)
+    {
+#ifdef HANDLE_MEMORY_EXCEPTION
+        HANDLE_MEMORY_EXCEPTION;
+#endif
+        row = col = col_var = 0;
+        return;
+    }
     for (int i = 0; i < row; i++)
-        output[i] = nfa.g[i].data.output;
+        output[i] = nfa.g[i].data.output.empty() ? NON_ACC : nfa.g[i].data.output.front();
     for (int i = 0; i < row; i++)
         for (int j = 0; j < col; j++)
             table[i * col + j] = UNDEFINED;
@@ -353,9 +413,97 @@ lr1_parsing_table::lr1_parsing_table(grammar g)
         for (int j = 0; j < nfa.g[i].size(); j++)
         {
             const hash_symbol_info *p_info = QuerySymbol(aidx, nfa.g[i][j].data.value);
-            int j_col = p_info->idx + (p_info->regular ? g.productions.size() : 0);
-            if (table[i * col + j_col] == UNDEFINED)
-                table[i * col + j_col] = (int)(long long)nfa.g[i][j].to->aux;
+            if (table[i * col + p_info->idx] == UNDEFINED)
+                table[i * col + p_info->idx] = (int)(long long)nfa.g[i][j].to->aux;
+        }
+    }
+}
+
+/**
+ * @brief Construct a new object from binary buffer
+ * 
+ * @param p buffer pointer
+ */
+lr1_parsing_table::lr1_parsing_table(const void *p)
+{
+    table = NULL;
+    reduc_var = output = NULL;
+    reduc_expr = NULL;
+    reduc_idx = NULL;
+    aidx = NULL;
+    if (p == NULL)
+    {
+        row = col = col_var = 0;
+        return;
+    }
+    unsigned char *pc = (unsigned char *)p;
+    row = *(int *)pc;
+    pc += sizeof(int);
+    col = *(int *)pc;
+    pc += sizeof(int);
+    col_var = *(int *)pc;
+    pc += sizeof(int);
+    reduc_size = *(int *)pc;
+    pc += sizeof(int);
+    s = *(int *)pc;
+    pc += sizeof(int);
+    table = (int *)malloc(sizeof(int) * row * col);
+    output = (unsigned int *)malloc(sizeof(unsigned int) * row);
+    reduc_var = (unsigned int *)malloc(sizeof(unsigned int) * reduc_size);
+    reduc_expr = new (std::nothrow) list<unsigned int>[reduc_size];
+    reduc_idx = (int *)malloc(sizeof(int) * reduc_size);
+    aidx = new (std::nothrow) list<hash_symbol_info>[HASH_SZ];
+    if (table == NULL || reduc_var == NULL || reduc_idx == NULL ||
+        reduc_expr == NULL || aidx == NULL || output == NULL)
+    {
+#ifdef HANDLE_MEMORY_EXCEPTION
+        HANDLE_MEMORY_EXCEPTION;
+#endif
+        row = col = col_var = 0;
+        return;
+    }
+    for (int i = 0; i < row * col; i++)
+    {
+        table[i] = *(int *)pc;
+        pc += sizeof(int);
+    }
+    for (int i = 0; i < row; i++)
+    {
+        output[i] = *(unsigned int *)pc;
+        pc += sizeof(unsigned int);
+    }
+    for (int i = 0; i < reduc_size; i++)
+    {
+        reduc_var[i] = *(unsigned int *)pc;
+        pc += sizeof(unsigned int);
+    }
+    for (int i = 0; i < reduc_size; i++)
+    {
+        int sz = *((int *)pc);
+        pc += sizeof(int);
+        for (int j = 0; j < sz; j++)
+        {
+            reduc_expr[i].append(*(unsigned int *)pc);
+            pc += sizeof(unsigned int);
+        }
+    }
+    for (int i = 0; i < reduc_size; i++)
+    {
+        reduc_idx[i] = *(int *)pc;
+        pc += sizeof(int);
+    }
+    int cnt = *((int *)pc);
+    pc += sizeof(int);
+    for (int i = 0; i < cnt; i++)
+    {
+        int idx = *(int *)pc;
+        pc += sizeof(int);
+        int sz = *((int *)pc);
+        pc += sizeof(int);
+        for (int j = 0; j < sz; j++)
+        {
+            aidx[idx].append(*((hash_symbol_info *)pc));
+            pc += sizeof(hash_symbol_info);
         }
     }
 }
@@ -370,6 +518,8 @@ lr1_parsing_table::~lr1_parsing_table()
         free(reduc_var);
     if (reduc_expr != NULL)
         delete[] reduc_expr;
+    if (reduc_idx != NULL)
+        free(reduc_idx);
     if (aidx != NULL)
         delete[] aidx;
     if (table != NULL)
@@ -390,6 +540,8 @@ const lr1_parsing_table &lr1_parsing_table::operator=(const lr1_parsing_table &b
         free(reduc_var);
     if (reduc_expr != NULL)
         delete[] reduc_expr;
+    if (reduc_idx != NULL)
+        free(reduc_idx);
     if (aidx != NULL)
         delete[] aidx;
     if (table != NULL)
@@ -401,54 +553,166 @@ const lr1_parsing_table &lr1_parsing_table::operator=(const lr1_parsing_table &b
 }
 
 /**
+ * @brief Store the table into binary-byte buffer
+ * 
+ * @param p the binary-byte buffer
+ * @return the size of buffer 
+ */
+int lr1_parsing_table::store(void *p)
+{
+    if (p == NULL)
+    {
+        int sz = 0;
+        for (int i = 0; i < reduc_size; i++)
+            sz += sizeof(unsigned int) * reduc_expr[i].size();
+        for (int i = 0; i < HASH_SZ; i++)
+            if (!aidx[i].empty())
+                sz += sizeof(int) * 2 + sizeof(hash_symbol_info) * aidx[i].size();
+        return sizeof(int) * (6 + row * col + reduc_size * 2) +
+               sizeof(unsigned int) * (row + reduc_size) + sz;
+    }
+    unsigned char *pc = (unsigned char *)p;
+    *(int *)pc = row;
+    pc += sizeof(int);
+    *(int *)pc = col;
+    pc += sizeof(int);
+    *(int *)pc = col_var;
+    pc += sizeof(int);
+    *(int *)pc = reduc_size;
+    pc += sizeof(int);
+    *(int *)pc = s;
+    pc += sizeof(int);
+    for (int i = 0; i < row * col; i++)
+    {
+        *(int *)pc = table[i];
+        pc += sizeof(int);
+    }
+    for (int i = 0; i < row; i++)
+    {
+        *(unsigned int *)pc = output[i];
+        pc += sizeof(unsigned int);
+    }
+    for (int i = 0; i < reduc_size; i++)
+    {
+        *(unsigned int *)pc = reduc_var[i];
+        pc += sizeof(unsigned int);
+    }
+    for (int i = 0; i < reduc_size; i++)
+    {
+        *(int *)pc = reduc_expr[i].size();
+        pc += sizeof(int);
+        for (int j = 0; j < reduc_expr[i].size(); j++)
+        {
+            *(unsigned int *)pc = reduc_expr[i][j];
+            pc += sizeof(unsigned int);
+        }
+    }
+    for (int i = 0; i < reduc_size; i++)
+    {
+        *(int *)pc = reduc_idx[i];
+        pc += sizeof(int);
+    }
+    int cnt = 0;
+    for (int i = 0; i < HASH_SZ; i++)
+        if (!aidx[i].empty())
+            cnt++;
+    *(int *)pc = cnt;
+    pc += sizeof(int);
+    for (int i = 0; i < HASH_SZ; i++)
+        if (!aidx[i].empty())
+        {
+            *(int *)pc = i;
+            pc += sizeof(int);
+            *(int *)pc = aidx[i].size();
+            pc += sizeof(int);
+            for (int j = 0; j < aidx[i].size(); j++)
+            {
+                *(hash_symbol_info *)pc = aidx[i][j];
+                pc += sizeof(hash_symbol_info);
+            }
+        }
+    return pc - (unsigned char *)p;
+}
+
+/**
  * @brief Parsing function
  * 
  * @param tk token stream
+ * @param f_list function list
  * @return whether successful
  */
-bool lr1_parsing_table::parse(list<token_info> tk, parsing_tree &tr)
+bool lr1_parsing_table::postfixtrans(list<token_info> tk,
+                                     const void *(*f_list[])(const void **),
+                                     const void *(*ft_list[])(const token_info &))
 {
     tk.append(token_info(ENDMARK));
     list<int> st_state;
     st_state.push_back(s);
     unsigned int start_symbol = AUGMNTED;
-    list<parsing_tree> st_buffer;
-    list<parsing_tree> st_input;
+    list<unsigned int> st_buffer;
+    list<unsigned int> st_input;
+    list<const void *> st_buffer_attr;
+    list<const void *> st_input_attr;
     int id_tr = 0;
     for (int i = 0; i < tk.size(); i++)
-        st_input.push_front({id_tr++, tk[i].token, tk[i]});
-    while (st_input.top().symbol != start_symbol)
+    {
+        st_input.push_front(tk[i].token);
+        const hash_symbol_info *p_info = QuerySymbol(aidx, tk[i].token);
+        st_input_attr.push_front(
+            tk[i].token == ENDMARK ? NULL : ft_list[p_info->idx - col_var](tk[i]));
+    }
+    while (st_input.top() != start_symbol)
     {
         int state = st_state.top();
-        const hash_symbol_info *p_info = QuerySymbol(aidx, st_input.top().symbol);
+        const hash_symbol_info *p_info = QuerySymbol(aidx, st_input.top());
         int c = p_info == NULL ? 0 : p_info->idx;
         if (p_info == NULL || table[state * col + c] == UNDEFINED)
             if (output[state] == NON_ACC)
                 return false;
             else
             {
-                st_input.push_back(st_buffer.top()); // reduce
-                st_buffer.pop_back();
-                st_state.pop_back();
-                list<parsing_tree> subtree;
-                for (int i = 0; i < reduc_expr[output[state]].size(); i++)
+                const void **args;
+                if (reduc_expr[output[state]].empty())
+                    args = NULL;
+                else
                 {
-                    subtree.push_front(st_buffer.top());
-                    st_buffer.pop_back();
+                    args = (const void **)malloc(
+                        sizeof(const void *) * reduc_expr[output[state]].size());
+                    if (args == NULL)
+                    {
+#ifdef HANDLE_MEMORY_EXCEPTION
+                        HANDLE_MEMORY_EXCEPTION;
+#endif
+                        return false;
+                    }
                 }
-                for (int i = 0; i < reduc_expr[output[state]].size(); i++)
+                st_input.push_back(st_buffer.top()); // reduce
+                st_input_attr.push_back(st_buffer_attr.top());
+                st_buffer.pop_back();
+                st_buffer_attr.pop_back();
+                st_state.pop_back();
+                for (int i = reduc_expr[output[state]].size() - 1; i >= 0; i--)
+                {
+                    args[i] = st_buffer_attr.top();
+                    st_buffer.pop_back();
+                    st_buffer_attr.pop_back();
                     st_state.pop_back();
-                st_input.push_back({id_tr++, reduc_var[output[state]], token_info(), subtree});
+                }
+                st_input.push_back(reduc_var[output[state]]);
+                st_input_attr.push_back(f_list[reduc_idx[output[state]]](args));
+                if (args != NULL)
+                    free(args);
             }
         else
         {
             if (st_input.empty())
                 return false;
             st_buffer.push_back(st_input.top()); // shift
+            st_buffer_attr.push_back(st_input_attr.top());
             st_state.push_back(table[state * col + c]);
             st_input.pop_back();
+            st_input_attr.pop_back();
         }
     }
-    tr = st_input.top();
     return true;
 }

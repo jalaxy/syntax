@@ -4,6 +4,7 @@
     },
     "files.associations": {
         "*.inc": "makefile",
-        "xlocale": "cpp"
+        "xlocale": "cpp",
+        "cstdarg": "cpp"
     }
 }

@@ -31,6 +31,7 @@ token_info::token_info(const token_info &b)
 #ifdef HANDLE_MEMORY_EXCEPTION
         HANDLE_MEMORY_EXCEPTION;
 #endif
+        return;
     }
     memcpy(lexeme, b.lexeme, sz * sizeof(wchar_t));
 }
@@ -62,6 +63,7 @@ token_info::token_info(unsigned int TOKEN, const wchar_t *LEXEME, int len)
 #ifdef HANDLE_MEMORY_EXCEPTION
         HANDLE_MEMORY_EXCEPTION;
 #endif
+        return;
     }
     memcpy(lexeme, LEXEME, len * sizeof(wchar_t));
     lexeme[len] = L'\0';
@@ -91,6 +93,7 @@ token_info &token_info::operator=(const token_info &b)
 #ifdef HANDLE_MEMORY_EXCEPTION
             HANDLE_MEMORY_EXCEPTION;
 #endif
+            return *this;
         }
         memcpy(lexeme, b.lexeme, sz * sizeof(wchar_t));
     }
@@ -136,6 +139,7 @@ void transition_table::copy(const transition_table &b)
 #ifdef HANDLE_MEMORY_EXCEPTION
             HANDLE_MEMORY_EXCEPTION;
 #endif
+            return;
         }
         memcpy(table, b.table, sizeof(int) * row * col);
         memcpy(sep, b.sep, sizeof(unsigned int) * col);
@@ -185,6 +189,7 @@ transition_table::transition_table(fa dfa, list<unsigned int> lsep, list<unsigne
 #ifdef HANDLE_MEMORY_EXCEPTION
         HANDLE_MEMORY_EXCEPTION;
 #endif
+        return;
     }
     for (int i = 0; i < row; i++)
     {
@@ -222,8 +227,8 @@ transition_table::transition_table(fa dfa, list<unsigned int> lsep, list<unsigne
     for (int i = 0; i < row; i++)
         f[i] = dfa.g[i].aux == (vertex_t *)1;
     for (int i = 0; i < dfa.g.size(); i++)
-        ignore[i] = dfa.g[i].data.output < (unsigned int)types.size() &&
-                    types[dfa.g[i].data.output] == IGNORSYM;
+        ignore[i] = dfa.g[i].data.output.front() < (unsigned int)types.size() &&
+                    types[dfa.g[i].data.output.front()] == IGNORSYM;
     if (col > 0)
     {
         for (int i = 0; i < col - 1; i++)
@@ -231,7 +236,79 @@ transition_table::transition_table(fa dfa, list<unsigned int> lsep, list<unsigne
         sep[col - 1] = 0x110000;
     }
     for (int i = 0; i < dfa.g.size(); i++)
-        token[i] = dfa.g[i].data.output;
+        token[i] = dfa.g[i].data.output.empty() ? NON_ACC : dfa.g[i].data.output.front();
+}
+
+/**
+ * @brief Construct a new object from binary buffer
+ * 
+ * @param p buffer pointer
+ */
+transition_table::transition_table(const void *p)
+{
+    if (p == NULL)
+    {
+        table = NULL;
+        sep = token = NULL;
+        f = NULL;
+        ignore = NULL;
+        return;
+    }
+    unsigned char *pc = (unsigned char *)p;
+    row = *(int *)pc;
+    pc += sizeof(int);
+    col = *(int *)pc;
+    pc += sizeof(int);
+    s = *(int *)pc;
+    pc += sizeof(int);
+    if (row * col == 0)
+    {
+        table = NULL;
+        sep = token = NULL;
+        f = NULL;
+        ignore = NULL;
+        return;
+    }
+    else
+    {
+        table = (int *)malloc(sizeof(int) * row * col);
+        sep = (unsigned int *)malloc(sizeof(unsigned int) * col);
+        token = (unsigned int *)malloc(sizeof(unsigned int) * row);
+        f = (bool *)malloc(sizeof(bool) * row);
+        ignore = (bool *)malloc(sizeof(bool) * row);
+        if (table == NULL || sep == NULL || token == NULL || f == NULL || ignore == NULL)
+        {
+#ifdef HANDLE_MEMORY_EXCEPTION
+            HANDLE_MEMORY_EXCEPTION;
+#endif
+            return;
+        }
+        for (int i = 0; i < col; i++)
+        {
+            sep[i] = *(unsigned int *)pc;
+            pc += sizeof(unsigned int);
+        }
+        for (int i = 0; i < row; i++)
+        {
+            token[i] = *(unsigned int *)pc;
+            pc += sizeof(unsigned int);
+        }
+        for (int i = 0; i < row * col; i++)
+        {
+            table[i] = *(int *)pc;
+            pc += sizeof(int);
+        }
+        for (int i = 0; i < row; i++)
+        {
+            f[i] = *(bool *)pc;
+            pc += sizeof(bool);
+        }
+        for (int i = 0; i < row; i++)
+        {
+            ignore[i] = *(bool *)pc;
+            pc += sizeof(bool);
+        }
+    }
 }
 
 /**
@@ -267,56 +344,15 @@ transition_table &transition_table::operator=(const transition_table &b)
         if (f != NULL)
             free(f);
         if (ignore != NULL)
-            free(f);
+            free(ignore);
+        if (sep != NULL)
+            free(sep);
+        if (token != NULL)
+            free(token);
         copy(b);
     }
     return *this;
 }
-
-/**
- * @brief Operator []
- * 
- * @param idx the index
- * @return the first address of idx-th row
- */
-int *transition_table::operator[](int idx) { return &table[idx * col]; }
-
-/**
- * @brief Get the number of rows
- * 
- * @return the number of rows
- */
-int transition_table::get_row() { return row; }
-
-/**
- * @brief Get the number of columns
- * 
- * @return the number of columns
- */
-int transition_table::get_col() { return col; }
-
-/**
- * @brief Get the initial state
- * 
- * @return the initial state
- */
-int transition_table::get_start() { return s; }
-
-/**
- * @brief Get the token of i-th state
- * 
- * @param idx the index
- * @return the token
- */
-unsigned int transition_table::get_token(int idx) { return token[idx]; }
-
-/**
- * @brief Get the final state
- * 
- * @param idx the index to query
- * @return whether i-th state is acceptable
- */
-bool transition_table::is_acceptable(int idx) { return f[idx]; }
 
 /**
  * @brief Get next state according to separation
@@ -375,7 +411,55 @@ bool transition_table::token_stream(const wchar_t *str, list<token_info> &tokens
         }
         if (acceptable_state == UNDEFINED)
             return false;
-        tokens.append(token_info(token[acceptable_state], base, p - base));
+        if (!ignore[acceptable_state])
+            tokens.append(token_info(token[acceptable_state], base, p - base));
     }
     return true;
+}
+
+/**
+ * @brief Store the table into binary-byte buffer
+ * 
+ * @param p the binary-byte buffer
+ * @return the size of buffer
+ */
+int transition_table::store(void *p)
+{
+    if (p == NULL)
+        return sizeof(int) * (3 + row * col) +
+               sizeof(unsigned int) * (col + row) +
+               sizeof(bool) * (row + row);
+    unsigned char *pc = (unsigned char *)p;
+    *(int *)pc = row;
+    pc += sizeof(int);
+    *(int *)pc = col;
+    pc += sizeof(int);
+    *(int *)pc = s;
+    pc += sizeof(int);
+    for (int i = 0; i < col; i++)
+    {
+        *(unsigned int *)pc = sep[i];
+        pc += sizeof(unsigned int);
+    }
+    for (int i = 0; i < row; i++)
+    {
+        *(unsigned int *)pc = token[i];
+        pc += sizeof(unsigned int);
+    }
+    for (int i = 0; i < row * col; i++)
+    {
+        *(int *)pc = table[i];
+        pc += sizeof(int);
+    }
+    for (int i = 0; i < row; i++)
+    {
+        *(bool *)pc = f[i];
+        pc += sizeof(bool);
+    }
+    for (int i = 0; i < row; i++)
+    {
+        *(bool *)pc = ignore[i];
+        pc += sizeof(bool);
+    }
+    return pc - (unsigned char *)p;
 }

@@ -1,9 +1,5 @@
-variable:
-    S ::= A S B C D
-    A ::= 'a' A | 'a'
-    B ::= 'b' A
-terminal:
-    C ::= 'cc c' | 'dd'+
-    D ::= 'd'+
+E ::= E '+' T | E '-' T | T
+T ::= T '*' F | T '/' F | F
+F ::= '(' E ')' | 'a'
 ignore:
-    Space ::= ' ' | '/*' [#x0-#x10FFFF]* '*/'
+S ::= [#x20#xA#xD#x9]

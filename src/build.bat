@@ -1,0 +1,1 @@
+g++ pregen.cpp grammar.cpp expr.cpp fa.cpp lalr.cpp lexical.cpp -o pregen -g

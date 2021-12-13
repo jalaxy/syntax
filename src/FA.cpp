@@ -40,7 +40,7 @@ void fa::copy(const fa &b)
  */
 fa::fa()
 {
-    g.add_vertex({id++, NON_ACC});
+    g.add_vertex({id++, list<unsigned int>()});
     s = &g[0];
     sigma_range = 0;
 }
@@ -105,7 +105,7 @@ fa &fa::operator|=(fa &b)
         g = g + g;
     else
         g.merge(b.g);
-    g.add_vertex({id++, NON_ACC});
+    g.add_vertex({id++, list<unsigned int>()});
     g.add_edge(g.top(), *s, {EPSILON});
     g.add_edge(g.top(), *b.s, {EPSILON});
     s = &g.top();
@@ -142,7 +142,7 @@ fa &fa::operator<<=(fa &b)
  */
 fa &fa::operator~()
 {
-    g.add_vertex({id++, NON_ACC});
+    g.add_vertex({id++, list<unsigned int>()});
     for (unsigned int i = 0; i < sigma_range; i++)
         g.add_edge(g.top(), g.top(), {(unsigned int)i});
     for (int i = 0; i < g.size() - 1; i++)
@@ -175,7 +175,7 @@ fa &fa::operator~()
  */
 fa &fa::operator*()
 {
-    g.add_vertex({id++, NON_ACC});
+    g.add_vertex({id++, list<unsigned int>()});
     g.add_edge(g.top(), *s, {EPSILON});
     for (int i = 0; i < f.size(); i++)
         g.add_edge(*f[i], g.top(), {EPSILON});
@@ -204,7 +204,7 @@ void NormalizeID(fa &nfa)
 fa AtomicFA(unsigned int sigma, unsigned int sigma_range)
 {
     fa a;
-    a.g.add_vertex({id++, NON_ACC});
+    a.g.add_vertex({id++, list<unsigned int>()});
     a.g.add_edge(0, 1, {sigma});
     a.s = &a.g[0];
     a.f.append(&a.g[1]);
@@ -292,7 +292,7 @@ bool REToNFA(list<expr> relist, fa &nfa, unsigned int symbol_range)
         if (!op_stack.empty())
             return false;
         for (int j = 0; j < fa_stack.top().f.size(); j++)
-            fa_stack.top().f[j]->data.output = relist[i].lhs;
+            fa_stack.top().f[j]->data.output.append(relist[i].lhs);
         if (nfa.f.empty())
             nfa = fa_stack.top();
         else
@@ -313,7 +313,7 @@ bool REToNFA(list<expr> relist, fa &nfa, unsigned int symbol_range)
  */
 bool EliminateRingsRecursion(vertex_t *p, list<vertex_t *> &st)
 {
-    if (!st.empty() && p == st.bottom())
+    if (!st.empty() && p == st.front())
         return true;
     if (p->aux == (vertex_t *)1) // aux = 1 represents this vertex is visited
         return false;
@@ -348,7 +348,7 @@ void EliminateRings(fa &nfa)
         }
         if (found)
         {
-            nfa.g.add_vertex({id++, NON_ACC});
+            nfa.g.add_vertex({id++, list<unsigned int>()});
             for (int i = 0; i < st.size(); i++)
                 nfa.g.top().merge(*st[i]);
             for (int i = 0; i < nfa.g.size(); i++)
@@ -369,14 +369,14 @@ void EliminateRings(fa &nfa)
                 nfa.g[i].aux = (vertex_t *)-1;
             for (int i = 0; i < nfa.f.size(); i++)
                 nfa.f[i]->aux = (vertex_t *)(long long)i; // i is the index of nfa.f
-            nfa.g.top().data.output = NON_ACC;
+            nfa.g.top().data.output = list<unsigned int>();
             bool tmnl = false;
             for (int i = 0; i < st.size(); i++)
             {
                 if (st[i]->aux != (vertex_t *)-1) // it is a terminal
                 {
-                    if (st[i]->data.output < nfa.g.top().data.output)
-                        nfa.g.top().data.output = st[i]->data.output;
+                    if (!st[i]->data.output.empty())
+                        nfa.g.top().data.output += st[i]->data.output;
                     nfa.f.remove((long long)st[i]->aux);
                     tmnl = true;
                 }
@@ -483,6 +483,7 @@ void NFAToDFA(fa nfa, fa &dfa)
 #ifdef HANDLE_MEMORY_EXCEPTION
             HANDLE_MEMORY_EXCEPTION;
 #endif
+            return;
         }
     }
     nfa.g.mapping(dfa.g, 0);
@@ -496,6 +497,7 @@ void NFAToDFA(fa nfa, fa &dfa)
 #ifdef HANDLE_MEMORY_EXCEPTION
         HANDLE_MEMORY_EXCEPTION;
 #endif
+        return;
     }
     for (int i = 0; i < dfa.g.size(); i++)
     {
@@ -544,13 +546,14 @@ void NFAToDFA(fa nfa, fa &dfa)
                 }
             if (k == aidx[hash].size())
             {
-                dfa.g.add_vertex({size++, NON_ACC});
+                dfa.g.add_vertex({size++, list<unsigned int>()});
                 dfa.g.top().aux = (vertex_t *)new (std::nothrow) list<vertex_t *>;
                 if (dfa.g.top().aux == NULL)
                 {
 #ifdef HANDLE_MEMORY_EXCEPTION
                     HANDLE_MEMORY_EXCEPTION;
 #endif
+                    return;
                 }
                 *(list<vertex_t *> *)dfa.g.top().aux = dest[j];
                 dfa.g.add_edge(i, dfa.g.size() - 1, {symbols[j]});
@@ -567,14 +570,13 @@ void NFAToDFA(fa nfa, fa &dfa)
     {
         vertex_t &v = dfa.g[i];
         list<vertex_t *> &subset = *(list<vertex_t *> *)dfa.g[i].aux;
-        v.data.output = NON_ACC;
         for (int j = 0; j < subset.size(); j++)
         {
-            if (subset[j]->data.output < v.data.output)
-                v.data.output = subset[j]->data.output;
+            v.data.output += subset[j]->data.output;
             if (subset[j]->aux == (vertex_t *)1 && dfa.f.top() != &dfa.g[i])
                 dfa.f.append(&dfa.g[i]);
         }
+        v.data.output.set_reduce();
     }
     nfa.g.mapping(dfa.g, 0);
     dfa.s = nfa.s->aux;
@@ -605,7 +607,7 @@ void NFAToDFA(fa nfa, fa &dfa)
  */
 void MinimizeDFA(fa &dfa)
 {
-    dfa.g.add_vertex({UNDEFINED, NON_ACC});
+    dfa.g.add_vertex({UNDEFINED, list<unsigned int>()});
     list<int> group; // the group number of each dfa state
     for (int i = 0; i < dfa.g.size(); i++)
         group.append(0);
@@ -622,12 +624,12 @@ void MinimizeDFA(fa &dfa)
     int group_id;
     do
     {
-        list<list<int>> next;
+        list<list<unsigned int>> next;
         for (int i = 0; i < dfa.g.size(); i++)
         {
-            next.append(list<int>());
+            next.append(list<unsigned int>());
             next[i].append(group[i]);
-            next[i].append(dfa.g[i].data.output);
+            next[i].append(dfa.g[i].data.output.front());
         }
         for (int i = 0; i < symbols.size(); i++) // the i-th symbol
         {
@@ -685,6 +687,7 @@ void MinimizeDFA(fa &dfa)
         for (int j = 1; j < idx[i].size(); j++)
         {
             dfa.g[idx[i][0]].merge(dfa.g[idx[i][j]]);
+            dfa.g[idx[i][0]].data.output.merge(&dfa.g[idx[i][j]].data.output);
             dfa.g[idx[i][j]].aux = (vertex_t *)1; // will be removed
             rm_idx.append(idx[i][j]);
         }
@@ -700,7 +703,7 @@ void MinimizeDFA(fa &dfa)
         dfa.g.remove_vertex(rm_idx[i] - i);
     if (dfa.g.size() == 0)
     {
-        dfa.g.add_vertex({0, NON_ACC});
+        dfa.g.add_vertex({0, list<unsigned int>()});
         dfa.s = &dfa.g.top();
         dfa.f = list<vertex_t *>();
     }

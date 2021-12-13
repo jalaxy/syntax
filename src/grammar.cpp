@@ -38,9 +38,9 @@ int h(list<wchar_t> &l)
 void grammar::augment()
 {
     productions.push_front({AUGMNTED, list<list<unsigned int>>()});
-    productions.bottom().expression.push_back(list<unsigned int>());
-    productions.bottom().expression.top().push_back(s->variable);
-    s = &productions.bottom();
+    productions.front().expression.push_back(list<unsigned int>());
+    productions.front().expression.top().push_back(s->variable);
+    s = &productions.front();
 }
 
 /**
@@ -274,6 +274,7 @@ int ReadEBNFFromString(wchar_t *wbuf, list<expr> &ebnflist, unsigned int &start,
 #ifdef HANDLE_MEMORY_EXCEPTION
         HANDLE_MEMORY_EXCEPTION;
 #endif
+        return -2;
     }
     for (int i = 0; i < names.size(); i++)
     {
@@ -726,6 +727,7 @@ int EBNFToGrammar(list<expr> ebnflist, grammar &g, unsigned int s, unsigned int 
                         g.productions.top().expression.top().append(sym_stack.undertop());
                         g.productions.top().expression.append(list<unsigned int>()); // C -> B
                         g.productions.top().expression.top().append(sym_stack.top());
+                        sym_stack.pop_back();
                         sym_stack.top() = g.productions.top().variable;
                         break;
                     case OP_CMPLM:
@@ -760,6 +762,7 @@ int EBNFToGrammar(list<expr> ebnflist, grammar &g, unsigned int s, unsigned int 
 #ifdef HANDLE_MEMORY_EXCEPTION
         HANDLE_MEMORY_EXCEPTION;
 #endif
+        return -2;
     }
     for (int i = 0; i < g.productions.size(); i++)
     {
@@ -923,6 +926,7 @@ int EBNFToRE(list<expr> ebnflist, list<expr> &relist)
 #ifdef HANDLE_MEMORY_EXCEPTION
         HANDLE_MEMORY_EXCEPTION;
 #endif
+        return -2;
     }
     for (int i = 0; i < relist.size(); i++)
         aidx[relist[i].lhs % HASH_SZ].append({true, i, relist[i].lhs});
@@ -950,6 +954,7 @@ void EliminateUnreachableRE(list<expr> &relist, grammar g, list<unsigned int> ty
 #ifdef HANDLE_MEMORY_EXCEPTION
         HANDLE_MEMORY_EXCEPTION;
 #endif
+        return;
     }
     for (int i = 0; i < relist.size(); i++)
     {

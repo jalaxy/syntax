@@ -1,0 +1,1 @@
+g++ SDT.cpp grammar.cpp expr.cpp fa.cpp lalr.cpp lexical.cpp semantics.cpp -o SDT -g

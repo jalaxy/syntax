@@ -21,8 +21,8 @@ struct edge_info
 
 struct vertex_info
 {
-    unsigned int value;  // state id
-    unsigned int output; // state output e.g., tokens
+    unsigned int value;        // state id
+    list<unsigned int> output; // state output e.g., tokens
 };
 
 typedef vertex<vertex_info, edge_info> vertex_t;
