@@ -755,9 +755,10 @@ int EBNFToGrammar(list<expr> ebnflist, grammar &g, unsigned int s, unsigned int 
         g.productions[idx].expression.top().append(sym_stack.top());
         ebnflist[idx].rhs.pop_back();
     }
-    list<hash_symbol_info> *aidx = new (std::nothrow) list<hash_symbol_info>[HASH_SZ];
+    list<hash_symbol_info> *aidx = new (std::nothrow) list<hash_symbol_info>[HASH_SZ],
+                           *aidx_opt = new (std::nothrow) list<hash_symbol_info>[HASH_SZ];
     bool *v = (bool *)malloc(sizeof(bool) * g.productions.size());
-    if (aidx == NULL || v == NULL)
+    if (aidx == NULL || aidx_opt == NULL || v == NULL)
     {
 #ifdef HANDLE_MEMORY_EXCEPTION
         HANDLE_MEMORY_EXCEPTION;
@@ -774,6 +775,26 @@ int EBNFToGrammar(list<expr> ebnflist, grammar &g, unsigned int s, unsigned int 
             SingleSubstitution(g, aidx, i, v, id_start);
     for (int i = 0; i < g.productions.size(); i++)
         v[i] = false;
+    for (int i = 0; i < g.productions.size(); i++)
+        if (g.productions[i].expression.size() == 2 &&
+            g.productions[i].expression[0].size() == 1 &&
+            g.productions[i].expression[1].size() == 0)
+        {
+            int j;
+            list<hash_symbol_info> &info = aidx_opt[g.productions[i].expression[0].top() % HASH_SZ];
+            for (j = 0; j < info.size(); j++)
+                if (info[j].symbol == g.productions[i].expression[0].top())
+                    break;
+            if (j == info.size())
+                info.append({false, i, g.productions[i].expression[0].top()});
+            else
+                for (int k = 0; k < g.productions.size(); k++)
+                    for (int l = 0; l < g.productions[k].expression.size(); l++)
+                        for (int m = 0; m < g.productions[k].expression[l].size(); m++)
+                            if (g.productions[k].expression[l][m] == g.productions[i].variable)
+                                g.productions[k].expression[l][m] =
+                                    g.productions[info[j].idx].variable;
+        }
     TraverseGrammar(g, aidx, s, v);
     list<int> rm_idx;
     for (int i = 0; i < g.productions.size(); i++)
@@ -782,6 +803,7 @@ int EBNFToGrammar(list<expr> ebnflist, grammar &g, unsigned int s, unsigned int 
     for (int i = 0; i < rm_idx.size(); i++)
         g.productions.remove(rm_idx[i] - i);
     delete[] aidx;
+    delete[] aidx_opt;
     free(v);
     return -1; // no error
 }

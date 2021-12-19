@@ -1,5 +1,1 @@
-E ::= E '+' T | E '-' T | T
-T ::= T '*' F | T '/' F | F
-F ::= '(' E ')' | 'a'
-ignore:
-S ::= [#x20#xA#xD#x9]
+S ::= 'i' S 'e' S | 'i' S | 'a'

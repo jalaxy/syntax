@@ -311,7 +311,7 @@ bool REToNFA(list<expr> relist, fa &nfa, unsigned int symbol_range)
  * @param st a stack to record path
  * @return whether exists a ring from a particular vertex
  */
-bool EliminateRingsRecursion(vertex_t *p, list<vertex_t *> &st)
+bool EliminateRingsRecursion(vertex_t *p, list<vertex_t *> &st, list<vertex_t *> &vlist)
 {
     if (!st.empty() && p == st.front())
         return true;
@@ -319,9 +319,10 @@ bool EliminateRingsRecursion(vertex_t *p, list<vertex_t *> &st)
         return false;
     st.push_back(p);
     p->aux = (vertex_t *)1;
+    vlist.append(p);
     for (int i = 0; i < p->size(); i++)
         if ((*p)[i].data.value == EPSILON && (*p)[i].to != p)
-            if (EliminateRingsRecursion((*p)[i].to, st))
+            if (EliminateRingsRecursion((*p)[i].to, st, vlist))
                 return true;
     st.pop_back();
     return false;
@@ -336,18 +337,25 @@ void EliminateRings(fa &nfa)
 {
     bool found;
     unsigned int id = nfa.g.size();
+    int i_start = 0;
+    list<vertex_t *> vlist;
     do
     {
         found = false;
         list<vertex_t *> st;
-        for (int i = 0; i < nfa.g.size() && !found; i++)
+        int i;
+        for (int i = 0; i < nfa.g.size(); i++)
+            nfa.g[i].aux = (vertex_t *)0;
+        for (i = 0; i < nfa.g.size() && !found; i++)
         {
-            for (int i = 0; i < nfa.g.size(); i++)
-                nfa.g[i].aux = (vertex_t *)0;
-            found |= EliminateRingsRecursion(&nfa.g[i], st);
+            found |= EliminateRingsRecursion(&nfa.g[(i + i_start) % nfa.g.size()], st, vlist);
+            for (int i = 0; i < vlist.size(); i++)
+                vlist[i]->aux = (vertex_t *)0;
+            vlist.clear();
         }
         if (found)
         {
+            i_start = i - 1;
             nfa.g.add_vertex({id++, list<unsigned int>()});
             for (int i = 0; i < st.size(); i++)
                 nfa.g.top().merge(*st[i]);
@@ -489,9 +497,8 @@ void NFAToDFA(fa nfa, fa &dfa)
     nfa.g.mapping(dfa.g, 0);
     EpsilonClosure(nfa); // dfa.aux will store the subsets
     unsigned int size = nfa.g.size();
-    const int hash_size = 1024;
     list<hash_subset_info> *aidx;
-    aidx = new (std::nothrow) list<hash_subset_info>[hash_size];
+    aidx = new (std::nothrow) list<hash_subset_info>[HASH_SZ];
     if (aidx == NULL)
     {
 #ifdef HANDLE_MEMORY_EXCEPTION
@@ -502,7 +509,7 @@ void NFAToDFA(fa nfa, fa &dfa)
     for (int i = 0; i < dfa.g.size(); i++)
     {
         list<vertex_t *> &subset = *(list<vertex_t *> *)dfa.g[i].aux;
-        unsigned int hash = h(subset, hash_size);
+        unsigned int hash = h(subset, HASH_SZ);
         aidx[hash].append({i, subset});
     }
     for (int i = 0; i < dfa.g.size(); i++) // i-th dfa-state
@@ -536,7 +543,7 @@ void NFAToDFA(fa nfa, fa &dfa)
         for (int j = 0; j < dest.size(); j++)
         {
             dest[j].set_reduce();
-            unsigned int hash = h(dest[j], hash_size);
+            unsigned int hash = h(dest[j], HASH_SZ);
             int k;
             for (k = 0; k < aidx[hash].size(); k++)
                 if (dest[j] == aidx[hash][k].subset)

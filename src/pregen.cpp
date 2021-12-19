@@ -11,7 +11,8 @@
 
 #include "LALR.h"
 #include <cstdio>
-#include <windows.h>
+#include <cstdlib>
+#include <cstring>
 int int_len(int);
 void print(expr, FILE * = NULL);
 void print(list<expr>, FILE * = NULL);
@@ -36,18 +37,21 @@ int main(int argc, char **argv)
         printf("Error: can't locate file: %s.", argv[1]);
         return 0;
     }
-    char *buf = (char *)malloc(sizeof(char) * 32767);
-    wchar_t *wbuf = (wchar_t *)malloc(sizeof(wchar_t) * 32767);
+    fseek(fp, 0, SEEK_END);
+    size_t buf_len = ftell(fp);
+    rewind(fp);
+    char *buf = (char *)malloc(sizeof(char) * (buf_len + 1));
+    fread(buf, 1, buf_len, fp);
+    buf[buf_len] = 0;
+    size_t wbuf_len = mbstowcs(NULL, buf, buf_len);
+    wchar_t *wbuf = (wchar_t *)malloc(sizeof(wchar_t) * (buf_len + 1));
     if (buf == NULL || wbuf == NULL)
     {
         printf("Error: memory allocation error.");
         return 0;
     }
-    memset(buf, 0, sizeof(char) * 32767);
-    memset(wbuf, 0, sizeof(wchar_t) * 32767);
-    fread(buf, sizeof(char), 32767, fp);
-    for (int i = 0; i < 32767; i++)
-        wbuf[i] = buf[i];
+    mbstowcs(wbuf, buf, buf_len);
+    wbuf[wbuf_len] = L'\0';
     free(buf);
     fclose(fp);
     list<expr> ebnflist, relist;
@@ -88,6 +92,11 @@ int main(int argc, char **argv)
         return 0;
     }
     EliminateUnreachableRE(relist, g, types);
+    int gsz = 0;
+    for (int i = 0; i < g.productions.size(); i++)
+        gsz += g.productions[i].expression.size();
+    printf("Grammar size: %d\n", gsz);
+    printf("terminal size: %d\n", sep.size() + 1);
 
     fa dfa;
     REToNFA(relist, dfa, sep.size() + 1);
@@ -407,6 +416,7 @@ int main(int argc, char **argv)
     fprintf(fp, "};\n");
     free(tb_buf);
     fclose(fp);
+    printf("Generate successfully!\n");
     return 0;
 }
 int int_len(int x)
@@ -523,11 +533,7 @@ void print(list<wchar_t> name, FILE *fp)
     {
         wchar_t wstr[2] = {(unsigned short)name[j], 0};
         char str[8] = "\0\0\0\0\0\0\0";
-#ifdef _WIN32
-        WideCharToMultiByte(CP_ACP, 0, wstr, 2, str, 8, 0, NULL);
-#else
         wcstombs(str, wstr, 8);
-#endif
         if (fp == NULL)
             printf("%s", str);
         else
@@ -569,8 +575,12 @@ void print(list<list<wchar_t>> names, list<unsigned int> types, FILE *fp,
         {
             for (int j = 0; j < star_size - len - 12; j++)
                 fprintf(fp, " ");
-            fprintf(fp, "%s\n", suf);
+            fprintf(fp, "%s", suf);
         }
+        if (fp != NULL)
+            fprintf(fp, "\n");
+        else
+            printf("\n");
     }
 }
 void print(grammar g, list<list<wchar_t>> names, FILE *fp,
@@ -662,11 +672,7 @@ void print(list<unsigned int> l, bool ch, FILE *fp)
         {
             wchar_t wstr[2] = {(unsigned short)l[i], 0};
             char str[8] = "\0\0\0\0\0\0\0";
-#ifdef _WIN32
-            WideCharToMultiByte(CP_ACP, 0, wstr, 2, str, 8, 0, NULL);
-#else
             wcstombs(str, wstr, 8);
-#endif
             if (fp == NULL)
                 printf("%s", str);
             else

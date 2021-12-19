@@ -33,7 +33,7 @@
 #define IGNORSYM ((unsigned int)0xfffffff0) // symbols ignored
 
 #ifndef HASH_SZ
-#define HASH_SZ 1024
+#define HASH_SZ 32768
 #endif
 
 struct hash_symbol_info

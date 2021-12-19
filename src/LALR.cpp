@@ -11,6 +11,7 @@
 
 #include "LALR.h"
 #include <cstring>
+#include <cstdio>
 
 struct hash_lr1_items_info
 {
@@ -318,6 +319,7 @@ lr1_parsing_table::lr1_parsing_table(grammar g)
             }
             nfa.g.add_edge(i, info[j].idx, {items[i].sym});
         }
+    printf("LR NFA size: %d\n", nfa.g.size());
     NFAToDFA(nfa, nfa);
     list<list<unsigned int>> reducsym;
     list<list<int>> reducidx;
@@ -354,7 +356,10 @@ lr1_parsing_table::lr1_parsing_table(grammar g)
                         nfa.g.add_edge(reducidx[rdc][j], i, {reducsym[rdc][k]});
                 }
     }
+    printf("LR DFA size: %d\n", nfa.g.size());
     MinimizeDFA(nfa);
+    printf("Reduced LR DFA size: %d\n", nfa.g.size());
+    printf("Reduction state size: %d\n", nfa.f.size());
     delete[] first;
     delete[] aidx_item_1;
     reduc_var = (unsigned int *)malloc(sizeof(unsigned int) * reduc_var_list.size());
