@@ -360,6 +360,11 @@ lr1_parsing_table::lr1_parsing_table(grammar g)
     MinimizeDFA(nfa);
     printf("Reduced LR DFA size: %d\n", nfa.g.size());
     printf("Reduction state size: %d\n", nfa.f.size());
+    int cnt = 0;
+    for (int i = 0; i < nfa.g.size(); i++)
+        if (nfa.g[i].data.output.size() > 1)
+            cnt++;
+    printf("R/R Conflict: %d\n", cnt);
     delete[] first;
     delete[] aidx_item_1;
     reduc_var = (unsigned int *)malloc(sizeof(unsigned int) * reduc_var_list.size());

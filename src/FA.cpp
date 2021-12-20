@@ -340,26 +340,6 @@ bool EpsilonClosure(vertex_t *p, list<vertex_t *> &ring)
     if (closure.front() != NULL)
         closure.set_reduce();
     return false;
-    // list<vertex_t *> &closure = (*(list<vertex_t *> *)p->aux);
-    // if (!closure.empty())
-    //     return closure.front() == NULL;
-    // closure.append(p);
-    // closure.push_front(NULL); // visiting mark
-    // bool loop_any = false;
-    // for (int i = 0; i < p->size(); i++)
-    //     if ((*p)[i].data.value == EPSILON && (*p)[i].to != p)
-    //     {
-    //         list<vertex_t *> &next = *(list<vertex_t *> *)(*p)[i].to->aux;
-    //         bool loop = EpsilonClosure((*p)[i].to, ring);
-    //         closure += next;
-    //         if (loop)
-    //             ((list<vertex_t *> *)(*p)[i].to->aux)->clear();
-    //         // ring.append((*p)[i].to);
-    //         loop_any |= loop;
-    //     }
-    // closure.pop_front();
-    // closure.set_reduce();
-    // return loop_any;
 }
 
 /**

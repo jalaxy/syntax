@@ -102,7 +102,7 @@ variable:
     Boolean_expression ::= expression
     function_designator ::= function_identifier actual_parameter_list?
     actual_parameter_list ::= '(' actual_parameter (',' actual_parameter)* ')'
-    actual_parameter ::= expression | variable_access | procedure_identifier | function_identifier
+    actual_parameter ::= expression | variable_access
     statement ::= (label ':')? (simple_statement | structured_statement)
     simple_statement ::= (assignment_statement | procedure_statement | goto_statement)?
     assignment_statement ::= (variable_access | function_identifier) ':=' expression
@@ -120,7 +120,7 @@ variable:
     repetitive_statement ::= repeat_statement | while_statement | for_statement
     repeat_statement ::= 'repeat' statement_sequence 'until' Boolean_expression
     while_statement ::= 'while' Boolean_expression 'do' statement
-    for_statement ::= 'for' control_variable ':=' initial_value ('to' | 'downto') final_value
+    for_statement ::= 'for' control_variable ':=' initial_value ('to' | 'downto') final_value 'do' statement
     control_variable ::= entire_variable
     initial_value ::= expression
     final_value ::= expression

@@ -14,8 +14,19 @@ terminal size: 64
 Lexical NFA size: 274
 Lexical DFA size: 152
 Lexical minimized DFA size: 152
-LR NFA size: 4215
-LR DFA size: 2783
-Reduced LR DFA size: 818
-Reduction state size: 294
+LR NFA size: 4217
+LR DFA size: 2788
+Reduced LR DFA size: 838
+Reduction state size: 293
+Generate successfully!
+
+Grammar size: 767
+terminal size: 96
+Lexical NFA size: 1114
+Lexical DFA size: 555
+Lexical minimized DFA size: 505
+LR NFA size: 91181
+LR DFA size: 30254
+Reduced LR DFA size: 7445
+Reduction state size: 1521
 Generate successfully!
