@@ -1,0 +1,14 @@
+program hello(input, output);
+var a, b: integer;
+function world(c: integer): integer;
+begin
+    world := c;
+end;
+begin
+    read(a);
+    if a >= 0 then
+        b := 0
+    else
+        b := 1;
+    writeln(b);
+end.

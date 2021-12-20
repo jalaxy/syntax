@@ -304,143 +304,62 @@ bool REToNFA(list<expr> relist, fa &nfa, unsigned int symbol_range)
 }
 
 /**
- * @brief Recursion part of rings elimination
- *
- * @param p the current vertex
- * @param rings the list to record rings vertices
- * @param st a stack to record path
- * @return whether exists a ring from a particular vertex
- */
-bool EliminateRingsRecursion(vertex_t *p, list<vertex_t *> &st, list<vertex_t *> &vlist)
-{
-    if (!st.empty() && p == st.front())
-        return true;
-    if (p->aux == (vertex_t *)1) // aux = 1 represents this vertex is visited
-        return false;
-    st.push_back(p);
-    p->aux = (vertex_t *)1;
-    vlist.append(p);
-    for (int i = 0; i < p->size(); i++)
-        if ((*p)[i].data.value == EPSILON && (*p)[i].to != p)
-            if (EliminateRingsRecursion((*p)[i].to, st, vlist))
-                return true;
-    st.pop_back();
-    return false;
-}
-
-/**
- * @brief Eliminate the rings in nfa, to make it ordered
- * 
- * @param nfa the NFA to process
- */
-void EliminateRings(fa &nfa)
-{
-    bool found;
-    unsigned int id = nfa.g.size();
-    int i_start = 0;
-    list<vertex_t *> vlist;
-    do
-    {
-        found = false;
-        list<vertex_t *> st;
-        int i;
-        for (int i = 0; i < nfa.g.size(); i++)
-            nfa.g[i].aux = (vertex_t *)0;
-        for (i = 0; i < nfa.g.size() && !found; i++)
-        {
-            found |= EliminateRingsRecursion(&nfa.g[(i + i_start) % nfa.g.size()], st, vlist);
-            for (int i = 0; i < vlist.size(); i++)
-                vlist[i]->aux = (vertex_t *)0;
-            vlist.clear();
-        }
-        if (found)
-        {
-            i_start = i - 1;
-            nfa.g.add_vertex({id++, list<unsigned int>()});
-            for (int i = 0; i < st.size(); i++)
-                nfa.g.top().merge(*st[i]);
-            for (int i = 0; i < nfa.g.size(); i++)
-                nfa.g[i].aux = (vertex_t *)0;
-            for (int i = 0; i < st.size(); i++)
-                st[i]->aux = (vertex_t *)1; // when it is in this ring
-            int sz = nfa.g.top().size();
-            for (int i = 0; i < sz; i++)
-                if (nfa.g.top()[i].to->aux == (vertex_t *)1 &&
-                    nfa.g.top()[i].data.value != EPSILON)
-                    nfa.g.add_edge(nfa.g.size() - 1, nfa.g.size() - 1, {nfa.g.top()[i].data});
-            for (int i = 0; i < nfa.g.size() - 1; i++)
-                for (int j = 0; j < nfa.g[i].size(); j++)
-                    if (nfa.g[i][j].to->aux == (vertex_t *)1)
-                        nfa.g.add_edge(i, nfa.g.size() - 1, {nfa.g[i][j].data});
-            nfa.g.top().set_reduce();
-            for (int i = 0; i < nfa.g.size(); i++)
-                nfa.g[i].aux = (vertex_t *)-1;
-            for (int i = 0; i < nfa.f.size(); i++)
-                nfa.f[i]->aux = (vertex_t *)(long long)i; // i is the index of nfa.f
-            nfa.g.top().data.output = list<unsigned int>();
-            bool tmnl = false;
-            for (int i = 0; i < st.size(); i++)
-            {
-                if (st[i]->aux != (vertex_t *)-1) // it is a terminal
-                {
-                    if (!st[i]->data.output.empty())
-                        nfa.g.top().data.output += st[i]->data.output;
-                    nfa.f.remove((long long)st[i]->aux);
-                    tmnl = true;
-                }
-                if (st[i] == nfa.s)
-                    nfa.s = &nfa.g.top();
-            }
-            if (tmnl)
-                nfa.f.append(&nfa.g.top());
-            list<int> rm_idx;
-            for (int i = 0; i < nfa.g.size(); i++)
-                nfa.g[i].aux = (vertex_t *)(long long)i;
-            for (int i = 0; i < st.size(); i++)
-                rm_idx.append((long long)st[i]->aux);
-            rm_idx.sort(0, rm_idx.size() - 1);
-            for (int i = 0; i < rm_idx.size(); i++)
-                nfa.g.remove_vertex(rm_idx[i] - i);
-        }
-    } while (found);
-    NormalizeID(nfa);
-}
-
-/**
  * @brief Recursion part of epsilon-closure calculation
  * 
  * @param p current vertex to calculate
+ * @return whether in a ring
  */
-void EpsilonClosureRecursion(vertex_t *p)
+bool EpsilonClosure(vertex_t *p, list<vertex_t *> &ring)
 {
-    list<vertex_t *> &epsilon_closure = *(list<vertex_t *> *)(p->aux->aux);
-    if (epsilon_closure.top() != NULL)
-        return;
-    epsilon_closure.pop_back(); // pop the not-visited sign
-    epsilon_closure.push_back(p);
+    list<vertex_t *> &closure = (*(list<vertex_t *> *)p->aux);
+    if (closure.empty())
+        closure.append(p);
+    closure.push_front(NULL);
     for (int i = 0; i < p->size(); i++)
         if ((*p)[i].data.value == EPSILON && (*p)[i].to != p)
         {
-            EpsilonClosureRecursion((*p)[i].to);
-            epsilon_closure += *(list<vertex_t *> *)((*p)[i].to->aux->aux);
+            list<vertex_t *> &next = *(list<vertex_t *> *)(*p)[i].to->aux;
+            bool twice = next.size() > 1 && next.afterfront() == NULL,
+                 once = next.size() > 0 && next.front() == NULL && !twice;
+            if (next.empty())
+            {
+                EpsilonClosure((*p)[i].to, ring);
+                closure += next;
+            }
+            else if (once)
+            {
+                EpsilonClosure((*p)[i].to, ring);
+                next.pop_front();
+                closure += next;
+                next.push_front(NULL);
+            }
+            else if (!twice)
+                closure += next;
         }
-    epsilon_closure.set_reduce();
-}
-
-/**
- * @brief Calculate Epsilon-closure of an NFA.
- *        The result will be stored in nfa.g[i].aux. So make sure that
- *        dynamic list<vertex_t *> object is pre-allocated in aux 
- * 
- * @param nfa the NFA
- */
-void EpsilonClosure(fa &nfa)
-{
-    // initialize with NULL, representing not visited
-    for (int i = 0; i < nfa.g.size(); i++)
-        ((list<vertex_t *> *)nfa.g[i].aux->aux)->push_back(NULL);
-    for (int i = 0; i < nfa.g.size(); i++)
-        EpsilonClosureRecursion(&nfa.g[i]);
+    closure.pop_front();
+    if (closure.front() != NULL)
+        closure.set_reduce();
+    return false;
+    // list<vertex_t *> &closure = (*(list<vertex_t *> *)p->aux);
+    // if (!closure.empty())
+    //     return closure.front() == NULL;
+    // closure.append(p);
+    // closure.push_front(NULL); // visiting mark
+    // bool loop_any = false;
+    // for (int i = 0; i < p->size(); i++)
+    //     if ((*p)[i].data.value == EPSILON && (*p)[i].to != p)
+    //     {
+    //         list<vertex_t *> &next = *(list<vertex_t *> *)(*p)[i].to->aux;
+    //         bool loop = EpsilonClosure((*p)[i].to, ring);
+    //         closure += next;
+    //         if (loop)
+    //             ((list<vertex_t *> *)(*p)[i].to->aux)->clear();
+    //         // ring.append((*p)[i].to);
+    //         loop_any |= loop;
+    //     }
+    // closure.pop_front();
+    // closure.set_reduce();
+    // return loop_any;
 }
 
 /**
@@ -479,14 +398,12 @@ unsigned int h(list<vertex_t *> &l, unsigned int m)
  */
 void NFAToDFA(fa nfa, fa &dfa)
 {
-    EliminateRings(nfa);
     dfa.g = graph<vertex_info, edge_info>();
     dfa.f = list<vertex_t *>();
     for (int i = 0; i < nfa.g.size(); i++)
     {
-        dfa.g.add_vertex(nfa.g[i].data);
-        dfa.g[i].aux = (vertex_t *)new (std::nothrow) list<vertex_t *>;
-        if (dfa.g[i].aux == NULL)
+        nfa.g[i].aux = (vertex_t *)new (std::nothrow) list<vertex_t *>;
+        if (nfa.g[i].aux == NULL)
         {
 #ifdef HANDLE_MEMORY_EXCEPTION
             HANDLE_MEMORY_EXCEPTION;
@@ -494,24 +411,31 @@ void NFAToDFA(fa nfa, fa &dfa)
             return;
         }
     }
-    nfa.g.mapping(dfa.g, 0);
-    EpsilonClosure(nfa); // dfa.aux will store the subsets
+    for (int i = 0; i < nfa.g.size(); i++)
+        if (((list<vertex_t *> *)nfa.g[i].aux)->empty())
+        {
+            list<vertex_t *> ring;
+            EpsilonClosure(&nfa.g[i], ring);
+            for (int j = 0; j < ring.size(); j++)
+                if (ring[j] != &nfa.g[i])
+                    ((list<vertex_t *> *)ring[j]->aux)->clear();
+        }
     unsigned int size = nfa.g.size();
     list<hash_subset_info> *aidx;
+    dfa.g.add_vertex(nfa.s->data);
+    dfa.s = &dfa.g.top();
+    dfa.sigma_range = nfa.sigma_range;
+    dfa.g.top().aux = (vertex_t *)new (std::nothrow) list<vertex_t *>();
     aidx = new (std::nothrow) list<hash_subset_info>[HASH_SZ];
-    if (aidx == NULL)
+    if (aidx == NULL || dfa.g.top().aux == NULL)
     {
 #ifdef HANDLE_MEMORY_EXCEPTION
         HANDLE_MEMORY_EXCEPTION;
 #endif
         return;
     }
-    for (int i = 0; i < dfa.g.size(); i++)
-    {
-        list<vertex_t *> &subset = *(list<vertex_t *> *)dfa.g[i].aux;
-        unsigned int hash = h(subset, HASH_SZ);
-        aidx[hash].append({i, subset});
-    }
+    *(list<vertex_t *> *)dfa.s->aux = *(list<vertex_t *> *)nfa.s->aux;
+    aidx[h(*(list<vertex_t *> *)dfa.s->aux, HASH_SZ)].append({0, *(list<vertex_t *> *)dfa.s->aux});
     for (int i = 0; i < dfa.g.size(); i++) // i-th dfa-state
     {
         // elements in subset is the pointer to vertices of nfa
@@ -529,14 +453,14 @@ void NFAToDFA(fa nfa, fa &dfa)
                 for (l = 0; l < symbols.size(); l++)
                     if (symbols[l] == symbol)
                     {
-                        dest[l] += *(list<vertex_t *> *)(*subset[j])[k].to->aux->aux;
+                        dest[l] += *(list<vertex_t *> *)(*subset[j])[k].to->aux;
                         break;
                     }
                 if (l == symbols.size())
                 {
                     symbols.append(symbol);
                     dest.append(list<vertex_t *>());
-                    dest.top() += *(list<vertex_t *> *)(*subset[j])[k].to->aux->aux;
+                    dest.top() += *(list<vertex_t *> *)(*subset[j])[k].to->aux;
                 }
             }
         }
@@ -570,9 +494,11 @@ void NFAToDFA(fa nfa, fa &dfa)
     }
     delete[] aidx;
     for (int i = 0; i < nfa.g.size(); i++)
+        delete (list<vertex_t *> *)(nfa.g[i].aux);
+    for (int i = 0; i < nfa.g.size(); i++)
         nfa.g[i].aux = (vertex_t *)0;
     for (int i = 0; i < nfa.f.size(); i++)
-        nfa.f[i]->aux = (vertex_t *)1; // aux represents whether is a terminal
+        nfa.f[i]->aux = (vertex_t *)1; // aux represents whether is acceptable
     for (int i = 0; i < dfa.g.size(); i++)
     {
         vertex_t &v = dfa.g[i];
@@ -585,9 +511,6 @@ void NFAToDFA(fa nfa, fa &dfa)
         }
         v.data.output.set_reduce();
     }
-    nfa.g.mapping(dfa.g, 0);
-    dfa.s = nfa.s->aux;
-    dfa.sigma_range = nfa.sigma_range;
     for (int i = 0; i < dfa.g.size(); i++)
         delete (list<vertex_t *> *)(dfa.g[i].aux);
     for (int i = 0; i < dfa.g.size(); i++)
@@ -695,6 +618,7 @@ void MinimizeDFA(fa &dfa)
         {
             dfa.g[idx[i][0]].merge(dfa.g[idx[i][j]]);
             dfa.g[idx[i][0]].data.output.merge(&dfa.g[idx[i][j]].data.output);
+            dfa.g[idx[i][0]].data.output.set_reduce();
             dfa.g[idx[i][j]].aux = (vertex_t *)1; // will be removed
             rm_idx.append(idx[i][j]);
         }

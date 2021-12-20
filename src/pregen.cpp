@@ -100,8 +100,11 @@ int main(int argc, char **argv)
 
     fa dfa;
     REToNFA(relist, dfa, sep.size() + 1);
+    printf("Lexical NFA size: %d\n", dfa.g.size());
     NFAToDFA(dfa, dfa);
+    printf("Lexical DFA size: %d\n", dfa.g.size());
     MinimizeDFA(dfa);
+    printf("Lexical minimized DFA size: %d\n", dfa.g.size());
     transition_table tr_t(dfa, sep, types);
     lr1_parsing_table lr_t(g);
 

@@ -276,6 +276,17 @@ public:
     T &front() const { return head.next == NULL ? *head.p_data : *head.next->p_data; }
 
     /**
+     * @brief The second element
+     * 
+     * @return T& 
+     */
+    T &afterfront() const { return head.next == NULL
+                                       ? *head.p_data
+                                       : (head.next->next == NULL
+                                              ? *head.next->p_data
+                                              : *head.next->next->p_data); }
+
+    /**
      * @brief Clear the list
      * 
      */
