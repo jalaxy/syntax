@@ -34,7 +34,7 @@ int main(int argc, char **argv)
     fp = fopen(argv[1], "rb");
     if (fp == NULL)
     {
-        printf("Error: can't locate file: %s.", argv[1]);
+        printf("Error: can't locate file: %s.\n", argv[1]);
         return 0;
     }
     fseek(fp, 0, SEEK_END);
@@ -47,7 +47,7 @@ int main(int argc, char **argv)
     wchar_t *wbuf = (wchar_t *)malloc(sizeof(wchar_t) * (buf_len + 1));
     if (buf == NULL || wbuf == NULL)
     {
-        printf("Error: memory allocation error.");
+        printf("Error: memory allocation error.\n");
         return 0;
     }
     mbstowcs(wbuf, buf, buf_len);

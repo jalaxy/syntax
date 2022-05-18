@@ -1,4 +1,4 @@
-EBNFFILE = pf.txt
+EBNFFILE = ebnf.txt
 CXXFLAGS = -g -I include
 CC = g++
 SRCOBJS = src/grammar.o src/expr.o src/fa.o src/lalr.o src/lexical.o
