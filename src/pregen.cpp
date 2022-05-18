@@ -1,12 +1,12 @@
 /****************************************************************
  * @file pregen.cpp
  * @author Jiang, Xingyu (chinajxy@outlook.com)
- * @brief Generate source files semantics.* and SDT.*
+ * @brief Generate source files semantics.* and sdt.*
  * @version 0.1
  * @date 2021-12-12
- * 
+ *
  * @copyright Copyright (c) 2021
- * 
+ *
  ****************************************************************/
 
 #include "LALR.h"
@@ -345,10 +345,10 @@ int main(int argc, char **argv)
     fprintf(fp, "};\n");
     fclose(fp);
 
-    // Write SDT.cpp
-    fp = fopen("SDT.cpp", "wb");
+    // Write sdt.cpp
+    fp = fopen("sdt.cpp", "wb");
     fprintf(fp, "/***************************************\n");
-    fprintf(fp, " * @file SDT.cpp                       *\n");
+    fprintf(fp, " * @file sdt.cpp                       *\n");
     fprintf(fp, " * @brief Store tables and entry point *\n");
     fprintf(fp, " ***************************************/\n");
     fprintf(fp, "\n#include \"semantics.h\"\n");
@@ -385,7 +385,7 @@ int main(int argc, char **argv)
     fprintf(fp, "    list<token_info> tk;\n");
     fprintf(fp, "    bool suc = tr_t.token_stream(wbuf, tk);\n");
     fprintf(fp, "    suc &= lr_t.postfixtrans(tk, f_list, ft_list);\n");
-    fprintf(fp, "    printf(suc ? \"true\" : \"false\");\n");
+    fprintf(fp, "    printf(suc ? \"true\\n\" : \"false\\n\");\n");
     fprintf(fp, "    return 0;\n");
     fprintf(fp, "}\n");
     void *tb_buf;
@@ -548,6 +548,9 @@ void print(list<list<wchar_t>> names, list<unsigned int> types, FILE *fp,
 {
     for (int i = 0; i < names.size(); i++)
     {
+        for (int j = 1; j < names[i].size(); j++)
+            if (names[i][j - 1] == '*' && names[i][j] == '/')
+                names[i][j] = '|';
         if (fp != NULL && pre != NULL)
             fprintf(fp, "%s", pre);
         if (fp == NULL)

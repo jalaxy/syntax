@@ -1,0 +1,88 @@
+variable:
+    translation_unit ::= external_declaration*
+    external_declaration ::= function_definition | declaration
+    function_definition ::= declaration_specifier* declarator declaration* compound_statement
+    declaration_specifier ::= storage_class_specifier | type_specifier | type_qualifier
+    storage_class_specifier ::= 'auto' | 'register' | 'static' | 'extern' | 'typedef'
+    type_specifier ::= 'void' | 'char' | 'short' | 'int' | 'long' | 'float' | 'double' | 'signed' | 'unsigned' | struct_or_union_specifier | enum_specifier | typedef_name
+    struct_or_union_specifier ::= struct_or_union identifier '{' struct_declaration+ '}' | struct_or_union '{' struct_declaration+ '}' | struct_or_union identifier
+    struct_or_union ::= 'struct' | 'union'
+    struct_declaration ::= specifier_qualifier* struct_declarator_list
+    specifier_qualifier ::= type_specifier | type_qualifier
+    struct_declarator_list ::= struct_declarator | struct_declarator_list ',' struct_declarator
+    struct_declarator ::= declarator | declarator ':' constant_expression | ':' constant_expression
+    declarator ::= pointer? direct_declarator
+    pointer ::= '*' type_qualifier* pointer?
+    type_qualifier ::= 'const' | 'volatile'
+    direct_declarator ::= identifier | '(' declarator ')' | direct_declarator '[' constant_expression? ']' | direct_declarator '(' parameter_type_list ')' | direct_declarator '(' identifier* ')'
+    constant_expression ::= conditional_expression
+    conditional_expression ::= logical_or_expression | logical_or_expression '?' expression ':' conditional_expression
+    logical_or_expression ::= logical_and_expression | logical_or_expression '||' logical_and_expression
+    logical_and_expression ::= inclusive_or_expression | logical_and_expression '&&' inclusive_or_expression
+    inclusive_or_expression ::= exclusive_or_expression | inclusive_or_expression '|' exclusive_or_expression
+    exclusive_or_expression ::= and_expression | exclusive_or_expression '^' and_expression
+    and_expression ::= equality_expression | and_expression '&' equality_expression
+    equality_expression ::= relational_expression | equality_expression '==' relational_expression | equality_expression '!=' relational_expression
+    relational_expression ::= shift_expression | relational_expression '<' shift_expression | relational_expression '>' shift_expression | relational_expression '<=' shift_expression | relational_expression '>=' shift_expression
+    shift_expression ::= additive_expression | shift_expression '<<' additive_expression | shift_expression '>>' additive_expression
+    additive_expression ::= multiplicative_expression | additive_expression '+' multiplicative_expression | additive_expression '-' multiplicative_expression
+    multiplicative_expression ::= cast_expression | multiplicative_expression '*' cast_expression | multiplicative_expression '/' cast_expression | multiplicative_expression '%' cast_expression
+    cast_expression ::= unary_expression | '(' type_name ')' cast_expression
+    unary_expression ::= postfix_expression | '++' unary_expression | '--' unary_expression | unary_operator cast_expression | 'sizeof' unary_expression | 'sizeof' type_name
+    postfix_expression ::= primary_expression | postfix_expression '[' expression ']' | postfix_expression '(' assignment_expression* ')' | postfix_expression '.' identifier | postfix_expression '->' identifier | postfix_expression '++' | postfix_expression '--'
+    primary_expression ::= identifier | constant | string | '(' expression ')'
+    constant ::= integer_constant | character_constant | floating_constant
+    expression ::= assignment_expression | expression ',' assignment_expression
+    assignment_expression ::= conditional_expression | unary_expression assignment_operator assignment_expression
+    assignment_operator ::= '=' | '*=' | '/=' | '%=' | '+=' | '-=' | '<<=' | '>>=' | '&=' | '^=' | '|='
+    unary_operator ::= '&' | '*' | '+' | '-' | '~' | '!'
+    type_name ::= specifier_qualifier+ abstract_declarator?
+    parameter_type_list ::= parameter_list | parameter_list ',' '...'
+    parameter_list ::= parameter_declaration | parameter_list ',' parameter_declaration
+    parameter_declaration ::= declaration_specifier+ declarator | declaration_specifier+ abstract_declarator | declaration_specifier+
+    abstract_declarator ::= pointer | pointer direct_abstract_declarator | direct_abstract_declarator
+    direct_abstract_declarator ::=  '(' abstract_declarator ')' | direct_abstract_declarator? '[' constant_expression? ']' | direct_abstract_declarator? '(' parameter_type_list? ')'
+    enum_specifier ::= 'enum' identifier '{' enumerator_list '}' | 'enum' '{' enumerator_list '}' | 'enum' identifier
+    enumerator_list ::= enumerator | enumerator_list ',' enumerator
+    enumerator ::= identifier | identifier '=' constant_expression
+    typedef_name ::= identifier
+    declaration ::=  declaration_specifier+ init_declarator* ';'
+    init_declarator ::= declarator | declarator '=' initializer
+    initializer ::= assignment_expression | '{' initializer_list '}' | '{' initializer_list ',' '}'
+    initializer_list ::= initializer | initializer_list ',' initializer
+    compound_statement ::= '{' declaration* statement* '}'
+    statement ::= labeled_statement | expression_statement | compound_statement | selection_statement | iteration_statement | jump_statement
+    labeled_statement ::= identifier ':' statement | 'case' constant_expression ':' statement | 'default' ':' statement
+    expression_statement ::= expression? ';'
+    selection_statement ::= 'if' '(' expression ')' statement | 'if' '(' expression ')' statement 'else' statement | 'switch' '(' expression ')' statement
+    iteration_statement ::= 'while' '(' expression ')' statement | 'do' statement 'while' '(' expression ')' ';' | 'for' '(' expression? ';' expression? ';' expression? ')' statement
+    jump_statement ::= 'goto' identifier ';' | 'continue' ';' | 'break' ';' | 'return' expression? ';'
+terminal:
+    char_set ::= [#x0-#x10FFFF]
+    digit_sequence ::= [0-9] ("'"? [0-9])*
+    hexadecimal_digit_sequence ::= [0-9a-fA-F] ("'"? [0-9a-fA-F])*
+    integer_constant ::= (binary_literal | octal_literal | decimal_literal | hexadecimal_literal) integer_suffix?
+    binary_literal ::= ('0b' [0-1] | '0B' [0-1]) ("'"? [0-1])*
+    octal_literal ::= '0' ("'"? [0-7])*
+    decimal_literal ::= [1-9] ("'"? [0-9])*
+    hexadecimal_literal ::= ('0x' | '0X') ([0-9a-fA-F] ("'"? [0-9a-fA-F])*)
+    integer_suffix ::= [uU] [lL]? | [uU] ('ll' | 'LL')? | [lL] [uU]? | ('ll' | 'LL') [uU]?
+    character_constant ::= ('u8' | 'u' | 'U' | 'L')? "'" c_char+ "'"
+    c_char ::= char_set - ['\#xA#xD] | escape_sequence | universal_character_name
+    escape_sequence ::= simple_escape_sequence | octal_escape_sequence | hexadecimal_escape_sequence
+    simple_escape_sequence ::= "\'" | '\"' | '\?' | '\\' | '\a' | '\b' | '\f' | '\n' | '\r' | '\t' | '\v'
+    octal_escape_sequence ::= '\' [0-7] | '\' [0-7] [0-7] | '\' [0-7] [0-7] [0-7]
+    hexadecimal_escape_sequence ::= '\x' [0-9a-fA-F]+
+    hex_quad ::= [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F]
+    universal_character_name ::= '\u' hex_quad | '\U' hex_quad hex_quad
+    floating_constant ::= decimal_floating_point_literal | hexadecimal_floating_point_literal
+    decimal_floating_point_literal ::= fractional_constant exponent_part? [flFL]? | digit_sequence exponent_part [flFL]?
+    hexadecimal_floating_point_literal ::= ('0x' | '0X') (hexadecimal_fractional_constant binary_exponent_part [flFL]? | hexadecimal_digit_sequence binary_exponent_part [flFL]?)
+    fractional_constant ::= digit_sequence? '.' digit_sequence | digit_sequence '.'
+    hexadecimal_fractional_constant ::= hexadecimal_digit_sequence? '.' hexadecimal_digit_sequence | hexadecimal_digit_sequence '.'
+    exponent_part ::= 'e' ('+' | '-')? digit_sequence | 'E' ('+' | '-')? digit_sequence
+    binary_exponent_part ::= 'p' ('+' | '-')? digit_sequence | 'P' ('+' | '-')? digit_sequence
+    identifier ::= [_A-Za-z] [_0-9A-Za-z]*
+    string ::= ('u8' | 'u' | 'U' | 'L')? '"' (char_set - ["\#xA#xD] | escape_sequence | universal_character_name)* '"'
+ignore:
+    space ::= [#x9#xA#xD#x20] | '/*' (char_set* - char_set* '*/' char_set*) '*/' | '//' char_set* [#xA#xD]+
