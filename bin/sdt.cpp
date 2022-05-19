@@ -16,7 +16,8 @@ int main(int argc, char **argv)
         printf("Error: no input files.");
         return 0;
     }
-    FILE *fp_i = fopen(argv[1], "rb"), *fp_o = fopen(argv[2], "wb");
+    FILE *fp_i = fopen(argv[1], "rb");
+    fp_o = fopen(argv[2], "wb");
     if (fp_i == NULL || fp_o == NULL)
     {
         printf("Error: can't locate file: %s.", argv[1]);
@@ -39,6 +40,7 @@ int main(int argc, char **argv)
     list<token_info> tk;
     bool suc = tr_t.token_stream(wbuf, tk);
     suc &= lr_t.postfixtrans(tk, f_list, ft_list);
+    fclose(fp_o);
     printf(suc ? "true\n" : "false\n");
     return 0;
 }
