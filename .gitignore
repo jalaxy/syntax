@@ -6,6 +6,3 @@
 .vscode
 *.o
 *.exe
-semantics.cpp
-semantics.h
-sdt.cpp

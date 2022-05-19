@@ -4,9 +4,9 @@
  * @brief Function definition of LALR.h
  * @version 0.1
  * @date 2021-12-09
- * 
+ *
  * @copyright Copyright (c) 2021
- * 
+ *
  ****************************************************************/
 
 #include "LALR.h"
@@ -28,7 +28,7 @@ struct hash_prod_info
 
 /**
  * @brief Comparison between two LR(1) items
- * 
+ *
  * @param a one item
  * @param b the other item
  * @return whether two LR(1) items are the same
@@ -42,7 +42,7 @@ bool operator==(const lr1_item &a, const lr1_item &b)
 
 /**
  * @brief Hash function
- * 
+ *
  * @param i the LR(1) item
  * @return hash value
  */
@@ -56,7 +56,7 @@ int h(lr1_item &i)
 
 /**
  * @brief Hash function
- * 
+ *
  * @param v production variable
  * @param e expression
  * @return hash value
@@ -71,7 +71,7 @@ int h(unsigned int v, list<unsigned int> &e)
 
 /**
  * @brief The calculation of hash table
- * 
+ *
  * @param g the grammar
  * @param aidx the result hash table array
  * @param prod_sz production size, the index of first terminal
@@ -97,7 +97,7 @@ int CalcHash(grammar &g, list<hash_symbol_info> *aidx)
 
 /**
  * @brief Calculation of FIRST(variable)
- * 
+ *
  * @param g the grammar
  * @param variable the variable
  * @return the list of FIRST
@@ -147,8 +147,8 @@ list<unsigned int> lr1_parsing_table::calc_first(grammar &g, unsigned int variab
 
 /**
  * @brief Copy from another object
- * 
- * @param b 
+ *
+ * @param b
  */
 void lr1_parsing_table::copy(const lr1_parsing_table &b)
 {
@@ -186,14 +186,14 @@ void lr1_parsing_table::copy(const lr1_parsing_table &b)
 
 /**
  * @brief Construct a new LR(1) parsing table object
- * 
+ *
  * @param b another object
  */
 lr1_parsing_table::lr1_parsing_table(const lr1_parsing_table &b) { copy(b); }
 
 /**
  * @brief Construct a new LR(1) parsing table object
- * 
+ *
  * @param g a context-free grammar
  */
 lr1_parsing_table::lr1_parsing_table(grammar g)
@@ -365,6 +365,11 @@ lr1_parsing_table::lr1_parsing_table(grammar g)
         if (nfa.g[i].data.output.size() > 1)
             cnt++;
     printf("R/R Conflict: %d\n", cnt);
+    for (int i = 0; i < nfa.g.size(); i++)
+        if (nfa.g[i].data.output.size() > 1)
+            for (int j = 0; j < nfa.g[i].data.output.size(); j++)
+                printf(j == nfa.g[i].data.output.size() - 1 ? "%d\n" : "%d ",
+                       nfa.g[i].data.output[j]);
     delete[] first;
     delete[] aidx_item_1;
     reduc_var = (unsigned int *)malloc(sizeof(unsigned int) * reduc_var_list.size());
@@ -431,7 +436,7 @@ lr1_parsing_table::lr1_parsing_table(grammar g)
 
 /**
  * @brief Construct a new object from binary buffer
- * 
+ *
  * @param p buffer pointer
  */
 lr1_parsing_table::lr1_parsing_table(const void *p)
@@ -520,7 +525,7 @@ lr1_parsing_table::lr1_parsing_table(const void *p)
 
 /**
  * @brief Destroy the lr1 parsing table object
- * 
+ *
  */
 lr1_parsing_table::~lr1_parsing_table()
 {
@@ -540,8 +545,8 @@ lr1_parsing_table::~lr1_parsing_table()
 
 /**
  * @brief Assignment function
- * 
- * @param b 
+ *
+ * @param b
  * @return reference to this object
  */
 const lr1_parsing_table &lr1_parsing_table::operator=(const lr1_parsing_table &b)
@@ -564,9 +569,9 @@ const lr1_parsing_table &lr1_parsing_table::operator=(const lr1_parsing_table &b
 
 /**
  * @brief Store the table into binary-byte buffer
- * 
+ *
  * @param p the binary-byte buffer
- * @return the size of buffer 
+ * @return the size of buffer
  */
 int lr1_parsing_table::store(void *p)
 {
@@ -646,7 +651,7 @@ int lr1_parsing_table::store(void *p)
 
 /**
  * @brief Parsing function
- * 
+ *
  * @param tk token stream
  * @param f_list function list
  * @return whether successful

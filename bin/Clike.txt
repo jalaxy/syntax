@@ -1,0 +1,33 @@
+variable:
+    program ::= part_program program | part_program
+    part_program ::= var_decl | var_def | func_decl | func_def
+    var_decl ::= 'extern' identifier identifier index? ';'
+    var_def ::= identifier identifier index? ';'
+    func_decl ::= identifier identifier '(' param_list ')' ';'
+    func_def ::= identifier identifier '(' param_list ')' block
+    param_list ::= (identifier identifier (',' identifier identifier)*)?
+    block ::= '{' statement* '}'
+    statement ::= var_decl | func_decl | var_def | if_statement | while_statement | return_statement | expression ';' | block
+    if_statement ::= 'if' '(' expression ')' statement ('else' statement)?
+    while_statement ::= 'while' '(' expression ')' statement
+    return_statement ::= 'return' expression ';'
+    expression ::= bool_expression | identifier index? '=' bool_expression
+    bool_expression ::= secondary_expression | bool_expression RelOp secondary_expression
+    secondary_expression ::= term | secondary_expression '+' term | secondary_expression '-' term
+    term ::= factor | term '*' factor | term '/' factor | term '%' factor
+    factor ::= number | '(' expression ')' | variable | variable index
+    index ::= '[' expression ']'
+    number ::= integer | real
+    variable ::= identifier | func_call
+    func_call ::= identifier '(' arg_list ')'
+    arg_list ::= (expression (',' expression)*)?
+terminal:
+    digit ::= [0-9]
+    digits ::= digit+
+    letter ::= [a-zA-Z]
+    identifier ::= letter (letter | digit)*
+    integer ::= digits
+    real ::= digits '.' digits? | digits? '.' digits
+    RelOp ::= '<' | '<=' | '>' | '>=' | '==' | '!='
+ignore:
+    space ::= [#x9#xA#xD#x20]
