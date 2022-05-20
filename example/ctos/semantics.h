@@ -108,6 +108,7 @@ namespace op_t
         LE,
         GE,
         EQ,
+        NE,
         ASGN,
         J,
         JL,
@@ -126,7 +127,8 @@ namespace type_t
         GT,
         LE,
         GE,
-        EQ
+        EQ,
+        NE
     };
 }
 

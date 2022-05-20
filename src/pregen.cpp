@@ -83,6 +83,7 @@ int main(int argc, char **argv)
         return 0;
     }
     err = EBNFToRE(ebnflist_t, relist);
+    relist.sort(0, relist.size() - 1); // this needs to retrospect, why sort is needed here
     if (err != -1)
     {
         printf("Error: RegEx conversion error, please check terminal \"");

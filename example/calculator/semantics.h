@@ -27,8 +27,8 @@
  *   12                E   V                   *
  *   13                T   V                   *
  *   14                F   V                   *
- *   15          integer   T                   *
- *   16         fraction   T                   *
+ *   15              int   T                   *
+ *   16             frac   T                   *
  *   17                S   I                   *
  * (V -> variable, T -> terminal, I -> ignore) *
  ***********************************************/
@@ -110,14 +110,14 @@ class t_5
 public:
 };
 
-// class for integer
+// class for int
 class t_6
 {
 public:
     double val;
 };
 
-// class for fraction
+// class for frac
 class t_7
 {
 public:

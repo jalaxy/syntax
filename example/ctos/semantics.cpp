@@ -154,6 +154,9 @@ const void *f_0(const void **argv)
         case op_t::EQ:
             printf("    ==");
             break;
+        case op_t::NE:
+            printf("    !=");
+            break;
         case op_t::ASGN:
             printf("     =");
             break;
@@ -519,6 +522,7 @@ const void *f_10(const void **argv)
         case op_t::LE:
         case op_t::GE:
         case op_t::EQ:
+        case op_t::NE:
             fprintf(fp_o, "        mov %s, %%eax\n",
                     name_to_buf(arg_5->tplist[i].arg1, arg_5->tplist[i].imm1));
             fprintf(fp_o, "        mov %s, %%ebx\n",
@@ -537,6 +541,8 @@ const void *f_10(const void **argv)
                 fprintf(fp_o, "        jge l%d\n", label);
             else if (arg_5->tplist[i].op == op_t::EQ)
                 fprintf(fp_o, "        jz l%d\n", label);
+            else if (arg_5->tplist[i].op == op_t::NE)
+                fprintf(fp_o, "        jnz l%d\n", label);
             fprintf(fp_o, "        mov $0, %%eax\n");
             fprintf(fp_o, "        mov %%eax, %s\n",
                     name_to_buf(arg_5->tplist[i].res, arg_5->tplist[i].imm));
@@ -851,7 +857,7 @@ const void *f_26(const void **argv)
         printf("Identifier ");
         for (int j = 0; j < arg_0->name.size(); j++)
             printf("%c", ((list<wchar_t>)arg_0->name)[j]);
-        printf(" does not exsit!\n");
+        printf(" does not exist!\n");
         return retval;
     }
     retval->tplist.append({op_t::ASGN, arg_3->tplist.top().res,
@@ -906,6 +912,10 @@ const void *f_28(const void **argv)
     case type_t::EQ:
         retval->tplist.append(
             {op_t::EQ, arg_0->tplist.top().res, arg_2->tplist.top().res, names.size()});
+        break;
+    case type_t::NE:
+        retval->tplist.append(
+            {op_t::NE, arg_0->tplist.top().res, arg_2->tplist.top().res, names.size()});
         break;
     }
     names.append(list<wchar_t>());
@@ -1154,7 +1164,7 @@ const void *f_43(const void **argv)
         printf("Identifier ");
         for (int j = 0; j < arg_0->name.size(); j++)
             printf("%c", ((list<wchar_t>)arg_0->name)[j]);
-        printf(" does not exsit!\n");
+        printf(" does not exist!\n");
     }
     else
         retval->addr = info[i].idx;
@@ -1197,7 +1207,7 @@ const void *f_45(const void **argv)
         printf("Identifier ");
         for (int j = 0; j < arg_0->name.size(); j++)
             printf("%c", ((list<wchar_t>)arg_0->name)[j]);
-        printf(" does not exsit!\n");
+        printf(" does not exist!\n");
     }
     else
     {
@@ -1662,6 +1672,8 @@ const void *ft_22(const token_info &tk)
         retval->type = type_t::GE;
     else if (tk.lexeme[0] == L'=' && tk.lexeme[1] == L'=')
         retval->type = type_t::EQ;
+    else if (tk.lexeme[0] == L'!' && tk.lexeme[1] == L'=')
+        retval->type = type_t::NE;
 
     return retval;
 }

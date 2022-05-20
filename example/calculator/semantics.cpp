@@ -8,15 +8,15 @@
 #include "semantics.h"
 #include <cstdio>
 
-/*******************************************
- * The grammar is listed below:            *
- * Aug ::= E                               *
- * E ::= E '+' T | E '-' T | T             *
- * T ::= T '*' F | T '/' F | F             *
- * F ::= '(' E ')' | Temp51 integer Temp53 *
- * Temp51 ::= '+' | '-' | #E               *
- * Temp53 ::= fraction | #E                *
- *******************************************/
+/***************************************
+ * The grammar is listed below:        *
+ * Aug ::= E                           *
+ * E ::= E '+' T | E '-' T | T         *
+ * T ::= T '*' F | T '/' F | F         *
+ * F ::= '(' E ')' | Temp51 int Temp53 *
+ * Temp51 ::= '+' | '-' | #E           *
+ * Temp53 ::= frac | #E                *
+ ***************************************/
 
 // function for Aug ::= E
 const void *f_0(const void **argv)
@@ -140,21 +140,20 @@ const void *f_7(const void **argv)
     return retval;
 }
 
-// function for F ::= Temp51 integer Temp53
+// function for F ::= Temp51 int Temp53
 const void *f_8(const void **argv)
 {
     v_3 *retval = new (std::nothrow) v_3;
     if (retval == NULL)
         return NULL;
     const v_4 *arg_0 = (const v_4 *)argv[0]; // Temp51
-    const t_6 *arg_1 = (const t_6 *)argv[1]; // integer
+    const t_6 *arg_1 = (const t_6 *)argv[1]; // int
     const v_5 *arg_2 = (const v_5 *)argv[2]; // Temp53
 
     // add rules here
     retval->val = arg_1->val + arg_2->val;
     if (arg_0->neg)
         retval->val = -retval->val;
-
     return retval;
 }
 
@@ -199,13 +198,13 @@ const void *f_11(const void **argv)
     return retval;
 }
 
-// function for Temp53 ::= fraction
+// function for Temp53 ::= frac
 const void *f_12(const void **argv)
 {
     v_5 *retval = new (std::nothrow) v_5;
     if (retval == NULL)
         return NULL;
-    const t_7 *arg_0 = (const t_7 *)argv[0]; // fraction
+    const t_7 *arg_0 = (const t_7 *)argv[0]; // frac
 
     // add rules here
     retval->val = arg_0->val;
@@ -298,7 +297,7 @@ const void *ft_5(const token_info &tk)
     return retval;
 }
 
-// function for integer
+// function for int
 const void *ft_6(const token_info &tk)
 {
     t_6 *retval = new (std::nothrow) t_6;
@@ -318,7 +317,7 @@ const void *ft_6(const token_info &tk)
     return retval;
 }
 
-// function for fraction
+// function for frac
 const void *ft_7(const token_info &tk)
 {
     t_7 *retval = new (std::nothrow) t_7;

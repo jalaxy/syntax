@@ -1,0 +1,8 @@
+E ::= E '+' T | E '-' T | T
+T ::= T '*' F | T '/' F | F
+F ::= '(' E ')' | ('+' | '-')? int frac?
+terminal:
+int ::= [0-9]+
+frac ::= '.' [0-9]+
+ignore:
+S ::= [#x20#xA#xD#x9]

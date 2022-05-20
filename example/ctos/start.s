@@ -1,19 +1,16 @@
-.global print
-.global println
+.global printl
+.global printc
 .global _start
 
 .data
-lf:  .string  "\n"
 
 .text
-print:
+printl:
     pushl %ebp
     movl  %esp, %ebp
     subl  $16, %esp
     movl  8(%ebp), %eax
     movl  %ebp, %esi
-    subl  $1, %esi
-    movb  $32, 0(%esi)
 l:  subl  $1, %esi
     movl  $0, %edx
     movl  $10, %ecx
@@ -28,13 +25,15 @@ l:  subl  $1, %esi
     movl  %ebp, %edx
     subl  %esi, %edx
     int   $128
+    movl  %edx, %eax
     leave
     ret
 
-println:
+printc:
     movl  $4, %eax # write syscall
     movl  $1, %ebx
-    movl  $lf, %ecx
+    movl  %esp, %ecx
+    addl  $4, %ecx
     movl  $1, %edx
     int   $128
     ret
