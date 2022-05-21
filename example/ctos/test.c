@@ -1,6 +1,7 @@
 int printl(int n);
 void printc(char ch);
 int f1(int n);
+int f2(int n);
 int f1(int n)
 {
     if (n)
