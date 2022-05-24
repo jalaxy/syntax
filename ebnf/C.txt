@@ -6,7 +6,7 @@ variable:
     gen_asc ::= (type_name | 'default') ':' asgn_expr
     post_expr ::= pri_expr | post_expr '[' expr ']' | post_expr '(' arg_expr_list? ')' | post_expr '.' id | post_expr '->' id | post_expr '++' | post_expr '--' | '(' type_name ')' '{' init_list ','? '}'
     arg_expr_list ::= asgn_expr | arg_expr_list ',' asgn_expr
-    unary_expr ::= post_expr | '++' unary_expr | '--' unary_expr | '&' unary_expr | '*' unary_expr | '+' unary_expr | '-' unary_expr | '~' unary_expr | '!' unary_expr
+    unary_expr ::= post_expr | '++' unary_expr | '--' unary_expr | '&' cast_expr | '*' cast_expr | '+' cast_expr | '-' cast_expr | '~' cast_expr | '!' cast_expr | 'sizeof' unary_expr | 'sizeof' '(' type_name ')' | '_Alignof' '(' type_name ')'
     cast_expr ::= unary_expr | '(' type_name ')' cast_expr
     mul_expr ::= cast_expr | mul_expr '*' cast_expr | mul_expr '/' cast_expr | mul_expr '%' cast_expr
     add_expr ::= mul_expr | add_expr '+' mul_expr | add_expr '-' mul_expr
@@ -25,7 +25,7 @@ variable:
 terminal:
     char_set ::= [#x0-#x10FFFF]
     token ::= id | const | str_ltrl | punct
-    pp_token ::= header_name | id | pp_number | char_const | str_ltrl | punct | char_set - space
+    pp_token ::= header_name | id | pp_number | char_const | str_ltrl | punct | (char_set - space)
     id ::= ([_A-Za-z] | uni_char_name) ([_0-9A-Za-z] | uni_char_name)*
     uni_char_name ::= '\u' hex_quad | '\U' hex_quad hex_quad
     hex_quad ::= [0-9A-Fa-f] [0-9A-Fa-f] [0-9A-Fa-f] [0-9A-Fa-f]
@@ -38,19 +38,19 @@ terminal:
     float_const ::= dec_fconst | hex_fconst
     dec_fconst ::= (frac_const exp_part? | [0-9]+ exp_part) [FLfl]?
     hex_fconst ::= ('0x' | '0X') (hfrac_const | [0-9A-Fa-f]+) bin_exp_part [FLfl]?
-    frac_const ::= [0-9]+? '.' [0-9]+ | [0-9]+ '.'
+    frac_const ::= [0-9]* '.' [0-9]+ | [0-9]+ '.'
     exp_part ::=  [Ee] [+#x2D]? [0-9]+
     hfrac_const ::= [0-9A-Fa-f]* '.' [0-9A-Fa-f]+ | [0-9A-Fa-f]+ '.'
-    bin_exp_part ::= [Pp] [+#x2D]?[0-9]+
-    char_const ::= [LlUu] "'" ((char_set - ['\#xA]) | esc_seq)+ "'"
+    bin_exp_part ::= [Pp] [+#x2D]? [0-9]+
+    char_const ::= [LUu]? "'" ((char_set - ['\#xA]) | esc_seq)+ "'"
     esc_seq ::= sim_esc_seq | oct_esc_seq | hex_esc_seq | uni_char_name
     sim_esc_seq ::= "\'" | '\"' | '\?' | '\\' | '\a' |'\b' | '\f' | '\n' | '\r' | '\t' | '\v'
     oct_esc_seq ::= '\' [0-7] [0-7]? [0-7]?
     hex_esc_seq ::= '\x' [0-9A-Fa-f]+
     str_ltrl ::= ([UuL] | 'u8')? '"' ((char_set - ["\#xA]) | esc_seq)+ '"'
-    punct ::= [#x5B#x5D(){}.&*+#x2D~!/%<>#x5E|?:;=,#] | '->' | '++' | '--' | '<<' | '>>' | '<=' | '>=' | '==' | '!=' | '&&' | '||' | '...' | '*=' | '/=' | '%=' | '+=' | '-=' | '<<=' | '>>=' | '&=' | '^=' | '|=' | '##' | '<:' | ':>' | '<%' | '%>' | '%:' | '%:%:'
+    punct ::= [#x5B#x5D(){}.&*+#x2D~!/%<>#x5E|?:;=,#x23] | '->' | '++' | '--' | '<<' | '>>' | '<=' | '>=' | '==' | '!=' | '&&' | '||' | '...' | '*=' | '/=' | '%=' | '+=' | '-=' | '<<=' | '>>=' | '&=' | '^=' | '|=' | '##' | '<:' | ':>' | '<%' | '%>' | '%:' | '%:%:'
     header_name ::= '<' (char_set - [>#xA])+ '>' | '"' (char_set - ["#xA])+ '"'
     pp_number ::= ('.'? [0-9]) ([_0-9A-Za-z] | uni_char_name | [EePp] [+#x2D] | '.')*
 ignore:
     space ::= [#x9#xA#xD#x20]
-    comment ::= '/*' (char_set* - char_set* '*/' char_set*) '*/' | '//' char_set* [#xA#xD]+
+    comment ::= '/*' (char_set* - char_set* '*/' char_set*) '*/' | '//' (char_set - [#xA#xD])*
