@@ -1,9 +1,12 @@
 variable:
-    expr ::= asgn_expr | expr ',' asgn_expr
+    trans_unit ::= ex_decl | trans_unit ex_decl
+    ex_decl ::= func_def | decl
+    func_def ::= decl_spec decltor decl_list? comp_stmt
+    decl_list ::= decl | decl_list decl
     pri_expr ::= id | const | str_ltrl | '(' expr ')' | gen_sel
     gen_sel ::= '_Generic' '(' asgn_expr ',' gen_asc_list ')'
     gen_asc_list ::= gen_asc | gen_asc_list ',' gen_asc
-    gen_asc ::= (type_name | 'default') ':' asgn_expr
+    gen_asc ::= type_name ':' asgn_expr | 'default' ':' asgn_expr
     post_expr ::= pri_expr | post_expr '[' expr ']' | post_expr '(' arg_expr_list? ')' | post_expr '.' id | post_expr '->' id | post_expr '++' | post_expr '--' | '(' type_name ')' '{' init_list ','? '}'
     arg_expr_list ::= asgn_expr | arg_expr_list ',' asgn_expr
     unary_expr ::= post_expr | '++' unary_expr | '--' unary_expr | '&' cast_expr | '*' cast_expr | '+' cast_expr | '-' cast_expr | '~' cast_expr | '!' cast_expr | 'sizeof' unary_expr | 'sizeof' '(' type_name ')' | '_Alignof' '(' type_name ')'
@@ -20,13 +23,58 @@ variable:
     lor_expr ::= land_expr | lor_expr '||' land_expr
     cond_expr ::= lor_expr | lor_expr '?' expr ':' cond_expr
     asgn_expr ::= cond_expr | unary_expr '=' asgn_expr | unary_expr '*=' asgn_expr | unary_expr '/=' asgn_expr | unary_expr '%=' asgn_expr | unary_expr '+=' asgn_expr | unary_expr '-=' asgn_expr | unary_expr '<<=' asgn_expr | unary_expr '>>=' asgn_expr | unary_expr '&=' asgn_expr | unary_expr '^=' asgn_expr | unary_expr '|=' asgn_expr
-    type_name ::= 'type_name'
-    init_list ::= 'init_list'
+    expr ::= asgn_expr | expr ',' asgn_expr
+    decl ::= decl_spec init_decltor_list? ';' | st_asrt_decl
+    decl_spec ::= st_cl_spec decl_spec? | type_spec decl_spec? | type_qual decl_spec? | func_spec decl_spec? | align_spec decl_spec?
+    init_decltor_list ::= init_decltor | init_decltor_list ',' init_decltor
+    init_decltor ::= decltor | decltor '=' initlzer
+    st_cl_spec ::= 'typedef' | 'extern' | 'static' | '_Thread_local' | 'auto' | 'register'
+    type_spec ::= 'void' | 'char' | 'short' | 'int' | 'long' | 'float' | 'double' | 'signed' | 'unsigned' | '_Bool' | '_Complex' | at_type_spec | str_uni_spec | enum_spec | typedef_name
+    str_uni_spec ::= str_or_uni id? '{' str_decl_list '}' | str_or_uni id
+    str_or_uni ::= 'struct' | 'union'
+    str_decl_list ::= str_decl | str_decl_list str_decl
+    str_decl ::= spec_qual_list str_decltor_list? ';' | st_asrt_decl
+    spec_qual_list ::= type_spec spec_qual_list? | type_qual spec_qual_list? | align_spec spec_qual_list?
+    str_decltor_list ::= str_decltor | str_decltor_list ',' str_decltor
+    str_decltor ::= decltor | decltor? ':' cond_expr
+    enum_spec ::= 'enum' id? '{' enumtor_list ','? '}' | 'enum' id
+    enumtor_list ::= enumtor | enumtor_list ',' enumtor
+    enumtor ::= id | id '=' cond_expr
+    at_type_spec ::= '_Atomic' '(' type_name ')'
+    type_qual ::= 'const' | 'restrict' | 'volatile' | '_Atomic'
+    func_spec ::= 'inline' | '_Noreturn'
+    align_spec ::= '_Alignas' '(' type_name ')' | '_Alignas' '(' cond_expr ')'
+    decltor ::= pointer? dir_decl
+    dir_decl ::= id | '(' decltor ')' | dir_decl '[' type_qual_list? asgn_expr? ']' | dir_decl '[' type_qual_list? '*' ']' | dir_decl '(' par_type_list? ')'
+    pointer ::= '*' type_qual_list?  | '*' type_qual_list? pointer
+    type_qual_list ::= type_qual | 'static' | type_qual_list type_qual | type_qual_list 'static'
+    par_type_list ::= par_list | par_list ',' '...'
+    par_list ::= par_decl | par_list ',' par_decl
+    par_decl ::= decl_spec decltor | decl_spec abs_decltor?
+    type_name ::= spec_qual_list abs_decltor?
+    abs_decltor ::= pointer | pointer? dir_abs_decl
+    dir_abs_decl ::= '(' abs_decltor ')' | dir_abs_decl? '[' type_qual_list? asgn_expr? ']' | dir_abs_decl? '[' '*' ']' | dir_abs_decl? '(' par_type_list? ')'
+    initlzer ::= asgn_expr | '{' init_list '}' | '{' init_list ',' '}'
+    init_list ::= dsgn? initlzer | init_list ',' dsgn? initlzer
+    dsgn ::= dsgntor_list '='
+    dsgntor_list ::= dsgntor | dsgntor_list dsgntor
+    dsgntor ::= '[' cond_expr ']' | '.' id
+    st_asrt_decl ::= '_Static_assert' '(' cond_expr ',' str_ltrl ')' ';' | '_Static_assert' '(' cond_expr ')' ';'
+    stmt ::= lb_stmt | comp_stmt | expr_stmt | sel_stmt | iter_stmt | jmp_stmt
+    lb_stmt ::= id ':' stmt | 'case' cond_expr ':' stmt | 'default' ':' stmt
+    comp_stmt ::= '{' blk_item_list? '}'
+    blk_item_list ::= blk_item | blk_item_list blk_item
+    blk_item ::= decl | stmt
+    expr_stmt ::= expr? ';'
+    sel_stmt ::= 'if' '(' expr ')' stmt | 'if' '(' expr ')' stmt 'else' stmt | 'switch' '(' expr ')' stmt
+    iter_stmt ::= 'while' '(' expr ')' stmt | 'do' stmt 'while' '(' expr ')' ';' | 'for' '(' expr? ';' expr? ';' expr? ')' stmt | 'for' '(' decl expr? ';' expr? ')' stmt
+    jmp_stmt ::= 'goto' id ';' | 'continue' ';' | 'break' ';' | 'return' expr? ';'
 terminal:
     char_set ::= [#x0-#x10FFFF]
     token ::= id | const | str_ltrl | punct
     pp_token ::= header_name | id | pp_number | char_const | str_ltrl | punct | (char_set - space)
     id ::= ([_A-Za-z] | uni_char_name) ([_0-9A-Za-z] | uni_char_name)*
+    typedef_name ::= id
     uni_char_name ::= '\u' hex_quad | '\U' hex_quad hex_quad
     hex_quad ::= [0-9A-Fa-f] [0-9A-Fa-f] [0-9A-Fa-f] [0-9A-Fa-f]
     const ::= int_const | float_const | char_const

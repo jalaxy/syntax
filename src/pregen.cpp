@@ -421,6 +421,13 @@ int main(int argc, char **argv)
     free(tb_buf);
     fclose(fp);
     printf("Generate successfully!\n");
+    fp = fopen("names.txt", "w");
+    for (int i = 0; i < names.size(); i++)
+    {
+        char name[1024];
+        print(names[i], fp);
+        fprintf(fp, "\n");
+    }
     return 0;
 }
 int int_len(int x)

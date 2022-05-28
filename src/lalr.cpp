@@ -360,16 +360,19 @@ lr1_parsing_table::lr1_parsing_table(grammar g)
     MinimizeDFA(nfa);
     printf("Reduced LR DFA size: %d\n", nfa.g.size());
     printf("Reduction state size: %d\n", nfa.f.size());
-    int cnt = 0;
+    list<list<unsigned int>> rr_conflict;
+    list<unsigned int> sr_conflict;
     for (int i = 0; i < nfa.g.size(); i++)
+    {
         if (nfa.g[i].data.output.size() > 1)
-            cnt++;
-    printf("R/R Conflict: %d\n", cnt);
-    for (int i = 0; i < nfa.g.size(); i++)
-        if (nfa.g[i].data.output.size() > 1)
+        {
+            rr_conflict.append(list<unsigned int>());
             for (int j = 0; j < nfa.g[i].data.output.size(); j++)
-                printf(j == nfa.g[i].data.output.size() - 1 ? "%d\n" : "%d ",
-                       nfa.g[i].data.output[j]);
+                rr_conflict.top().append(nfa.g[i].data.output[j]);
+        }
+        if (nfa.g[i].data.output.size() > 0 && nfa.g[i].size() > 0)
+            sr_conflict.append(nfa.g[i].data.output.top());
+    }
     delete[] first;
     delete[] aidx_item_1;
     reduc_var = (unsigned int *)malloc(sizeof(unsigned int) * reduc_var_list.size());
@@ -403,6 +406,14 @@ lr1_parsing_table::lr1_parsing_table(grammar g)
             }
     }
     delete[] aidx_prod;
+    printf("R/R conflict: %d\n", rr_conflict.size());
+    for (int i = 0; i < rr_conflict.size(); i++)
+        for (int j = 0; j < rr_conflict[i].size(); j++)
+            printf(j == rr_conflict[i].size() - 1 ? "%d\n" : "%d ", reduc_var[rr_conflict[i][j]]);
+    printf("S/R conflict: %d\n", sr_conflict.size());
+    for (int i = 0; i < sr_conflict.size(); i++)
+        printf("%d ", reduc_var[sr_conflict[i]]);
+    printf("\n");
     row = nfa.g.size();
     table = (int *)malloc(sizeof(int) * row * col);
     output = (unsigned int *)malloc(sizeof(unsigned int) * row);
@@ -415,7 +426,13 @@ lr1_parsing_table::lr1_parsing_table(grammar g)
         return;
     }
     for (int i = 0; i < row; i++)
-        output[i] = nfa.g[i].data.output.empty() ? NON_ACC : nfa.g[i].data.output.front();
+    {
+        int j_min = 0;
+        for (int j = 1; j < nfa.g[i].data.output.size(); j++)
+            if (reduc_var[nfa.g[i].data.output[j]] < reduc_var[nfa.g[i].data.output[j_min]])
+                j_min = j;
+        output[i] = nfa.g[i].data.output.empty() ? NON_ACC : nfa.g[i].data.output[j_min];
+    }
     for (int i = 0; i < row; i++)
         for (int j = 0; j < col; j++)
             table[i * col + j] = UNDEFINED;
@@ -649,6 +666,41 @@ int lr1_parsing_table::store(void *p)
     return pc - (unsigned char *)p;
 }
 
+struct tree
+{
+    list<tree> subtree;
+    unsigned int val;
+    int idx = -1;
+};
+
+void print_tree(FILE *fp, tree &tr)
+{
+    static int x = 0;
+    if (tr.idx == -1)
+        tr.idx = x++;
+    FILE *fpname = fopen("bin/names.txt", "r");
+    if (tr.val == AUGMNTED)
+        fprintf(fp, "%d [label=\"Aug\"];\n", tr.idx);
+    else
+    {
+        static char str[1024];
+        int n = 1;
+        for (int i = 0; i <= tr.val; i++)
+            if (fscanf(fpname, "%s", str) == EOF)
+                str[0] = 0;
+        fprintf(fp, "%d [label=\"%s\"];\n", tr.idx, str);
+    }
+    fclose(fpname);
+    for (int i = tr.subtree.size() - 1; i >= 0; i--)
+    {
+        if (tr.subtree[i].idx == -1)
+            tr.subtree[i].idx = x++;
+        fprintf(fp, "%d->%d;\n", tr.idx, tr.subtree[i].idx);
+    }
+    for (int i = 0; i < tr.subtree.size(); i++)
+        print_tree(fp, tr.subtree[i]);
+}
+
 /**
  * @brief Parsing function
  *
@@ -668,6 +720,7 @@ bool lr1_parsing_table::postfixtrans(list<token_info> tk,
     list<unsigned int> st_input;
     list<const void *> st_buffer_attr;
     list<const void *> st_input_attr;
+    list<tree> st_buffer_tree, st_input_tree;
     int id_tr = 0;
     for (int i = 0; i < tk.size(); i++)
     {
@@ -675,6 +728,7 @@ bool lr1_parsing_table::postfixtrans(list<token_info> tk,
         const hash_symbol_info *p_info = QuerySymbol(aidx, tk[i].token);
         st_input_attr.push_front(
             tk[i].token == ENDMARK ? NULL : ft_list[p_info->idx - col_var](tk[i]));
+        st_input_tree.push_front({list<tree>(), tk[i].token});
     }
     while (st_input.top() != start_symbol)
     {
@@ -703,18 +757,24 @@ bool lr1_parsing_table::postfixtrans(list<token_info> tk,
                 }
                 st_input.push_back(st_buffer.top()); // reduce
                 st_input_attr.push_back(st_buffer_attr.top());
+                st_input_tree.push_back(st_buffer_tree.top());
                 st_buffer.pop_back();
                 st_buffer_attr.pop_back();
+                st_buffer_tree.pop_back();
                 st_state.pop_back();
+                list<tree> subtree;
                 for (int i = reduc_expr[output[state]].size() - 1; i >= 0; i--)
                 {
                     args[i] = st_buffer_attr.top();
+                    subtree.push_back(st_buffer_tree.top());
                     st_buffer.pop_back();
                     st_buffer_attr.pop_back();
+                    st_buffer_tree.pop_back();
                     st_state.pop_back();
                 }
                 st_input.push_back(reduc_var[output[state]]);
                 st_input_attr.push_back(f_list[reduc_idx[output[state]]](args));
+                st_input_tree.push_back({subtree, reduc_var[output[state]]});
                 if (args != NULL)
                     free(args);
             }
@@ -724,10 +784,16 @@ bool lr1_parsing_table::postfixtrans(list<token_info> tk,
                 return false;
             st_buffer.push_back(st_input.top()); // shift
             st_buffer_attr.push_back(st_input_attr.top());
+            st_buffer_tree.push_back(st_input_tree.top());
             st_state.push_back(table[state * col + c]);
             st_input.pop_back();
             st_input_attr.pop_back();
+            st_input_tree.pop_back();
         }
     }
+    FILE *fp = fopen("test.dot", "w");
+    fprintf(fp, "digraph {\nnode [fontname=\"Times New Roman, SimSun\"]\ngraph [dpi=300]");
+    print_tree(fp, st_input_tree.top());
+    fprintf(fp, "}");
     return true;
 }
