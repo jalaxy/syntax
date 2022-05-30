@@ -1,8 +1,19 @@
 variable:
-    trans_unit ::= ex_decl | trans_unit ex_decl
-    ex_decl ::= func_def | decl
-    func_def ::= decl_spec decltor decl_list? comp_stmt
-    decl_list ::= decl | decl_list decl
+    pp_file ::= group?
+    group ::= group_part | group group_part
+    group_part ::= if_sec | ctrl_line | text_line | '#' non_dir
+    if_sec ::= if_grp elif_grps? else_grp? endif_line
+    if_grp ::= '#' 'if' cond_expr [#xA] group? | '#' 'ifdef' id [#xA] group? | '#' 'ifndef' id [#xA] group?
+    elif_grps ::= elif_grp | elif_grps elif_grp
+    elif_grp ::= '#' 'elif' cond_expr [#xA] group?
+    else_grp ::= '#' 'else' [#xA] group?
+    endif_line ::= '#' 'endif' [#xA]
+    ctrl_line ::= '#' 'include' pp_tokens [#xA] | '#' 'define' id rpl_list [#xA] | '#' 'define' id lpr '...' ')' rpl_list [#xA] | '#' 'define' id lpr id_list ',' '...' ')' rpl_list [#xA] | '#' 'undef' id [#xA] | '#' 'line' pp_tokens? [#xA] | '#' 'error' pp_tokens? [#xA] | '#' 'pragma' pp_tokens? [#xA] | '#' [#xA]
+    id_list ::= id | id_list ',' id
+    text_line ::= pp_tokens? [#xA]
+    non_dir ::= pp_tokens [#xA]
+    rpl_list ::= pp_tokens?
+    pp_tokens ::= pp_token | pp_tokens pp_token
     pri_expr ::= id | const | str_ltrl | '(' expr ')' | gen_sel
     gen_sel ::= '_Generic' '(' asgn_expr ',' gen_asc_list ')'
     gen_asc_list ::= gen_asc | gen_asc_list ',' gen_asc
@@ -60,18 +71,14 @@ variable:
     dsgntor_list ::= dsgntor | dsgntor_list dsgntor
     dsgntor ::= '[' cond_expr ']' | '.' id
     st_asrt_decl ::= '_Static_assert' '(' cond_expr ',' str_ltrl ')' ';' | '_Static_assert' '(' cond_expr ')' ';'
-    stmt ::= lb_stmt | comp_stmt | expr_stmt | sel_stmt | iter_stmt | jmp_stmt
-    lb_stmt ::= id ':' stmt | 'case' cond_expr ':' stmt | 'default' ':' stmt
-    comp_stmt ::= '{' blk_item_list? '}'
-    blk_item_list ::= blk_item | blk_item_list blk_item
-    blk_item ::= decl | stmt
-    expr_stmt ::= expr? ';'
-    sel_stmt ::= 'if' '(' expr ')' stmt | 'if' '(' expr ')' stmt 'else' stmt | 'switch' '(' expr ')' stmt
-    iter_stmt ::= 'while' '(' expr ')' stmt | 'do' stmt 'while' '(' expr ')' ';' | 'for' '(' expr? ';' expr? ';' expr? ')' stmt | 'for' '(' decl expr? ';' expr? ')' stmt
-    jmp_stmt ::= 'goto' id ';' | 'continue' ';' | 'break' ';' | 'return' expr? ';'
+    pp_token ::= header_name | id | pp_number | char_const | str_ltrl | punct | [^#x20]
 terminal:
     char_set ::= [#x0-#x10FFFF]
+    header_name ::= '<' (char_set - [>#xA])+ '>' | '"' (char_set - ["#xA])+ '"'
     id ::= ([_A-Za-z] | uni_char_name) ([_0-9A-Za-z] | uni_char_name)*
+    pp_number ::= ('.'? [0-9]) ([_0-9A-Za-z] | uni_char_name | [EePp] [+#x2D] | '.')*
+    punct ::= [#x5B#x5D(){}.&*+#x2D~!/%<>#x5E|?:;=,#x23] | '->' | '++' | '--' | '<<' | '>>' | '<=' | '>=' | '==' | '!=' | '&&' | '||' | '...' | '*=' | '/=' | '%=' | '+=' | '-=' | '<<=' | '>>=' | '&=' | '^=' | '|=' | '##' | '<:' | ':>' | '<%' | '%>' | '%:' | '%:%:'
+    lpr ::= '(' ' '*
     typedef_name ::= id
     uni_char_name ::= '\u' hex_quad | '\U' hex_quad hex_quad
     hex_quad ::= [0-9A-Fa-f] [0-9A-Fa-f] [0-9A-Fa-f] [0-9A-Fa-f]
@@ -95,5 +102,5 @@ terminal:
     hex_esc_seq ::= '\x' [0-9A-Fa-f]+
     str_ltrl ::= ([UuL] | 'u8')? '"' ((char_set - ["\#xA]) | esc_seq)+ '"'
 ignore:
-    space ::= [#x9#xA#xD#x20]
-    comment ::= '/*' (char_set* - char_set* '*/' char_set*) '*/' | '//' (char_set - [#xA#xD])*
+    space ::= [#x9#xD#x20]
+    comment ::= '/*' (char_set* - char_set* '*/' char_set*) '*/' | '//' (char_set - [#xD])*
