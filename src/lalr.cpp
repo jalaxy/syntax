@@ -679,6 +679,8 @@ void print_tree(FILE *fp, tree &tr)
     if (tr.idx == -1)
         tr.idx = x++;
     FILE *fpname = fopen("bin/names.txt", "r");
+    if (fpname == NULL)
+        return;
     if (tr.val == AUGMNTED)
         fprintf(fp, "%d [label=\"Aug\"];\n", tr.idx);
     else
